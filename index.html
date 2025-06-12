@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="mobile-web-app-capable" content="yes">
+  <title>Hospital Room Directory - UMich (Collaborative)</title>
+
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/tailwindcss/2.2.19/tailwind.min.css" rel="stylesheet">
+  <link href="style.css" rel="stylesheet">
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fuse.js/6.6.2/fuse.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+  
+  <!-- Supabase JavaScript Client -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+</head>
+<body class="min-h-screen">
+  <div id="loading-overlay">
+    <div class="text-center">
+        <div class="spinner mb-4"></div>
+        <p class="text-lg font-semibold text-gray-700">Processing data...</p>
+        <p id="loading-status" class="text-sm text-gray-500 mt-2">Please wait...</p>
+    </div>
+  </div>
+
+  <div id="view-selection-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-[1000] hidden">
+    <div class="um-modal-content max-w-md w-full mx-4 p-8 text-center animate-scale-in">
+      <h3 class="text-2xl font-bold text-um-blue mb-8">Select Display Mode</h3>
+      <div class="flex flex-col sm:flex-row justify-around gap-4">
+        <button id="select-desktop-view-btn" class="px-6 py-4 um-button-blue font-semibold rounded-lg shadow-xl button-press w-full sm:w-1/2 text-lg">Desktop View</button>
+        <button id="select-mobile-view-btn" class="px-6 py-4 um-button-maize font-semibold rounded-lg shadow-xl button-press w-full sm:w-1/2 text-lg">Mobile View</button>
+      </div>
+    </div>
+  </div>
+
+  <button id="view-switch-btn" class="fixed top-5 right-5 z-[500] p-3 um-button-blue rounded-full shadow-xl button-press focus:outline-none" title="Switch View">
+    <svg id="view-switch-icon-MOBILE-ICON" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
+    </svg>
+    <svg id="view-switch-icon-DESKTOP-ICON" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-white hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"> <path stroke-linecap="round" stroke-linejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  </button>
+
+<main class="flex-grow flex flex-col p-6 gap-6 max-w-7xl mx-auto">
+    <div class="um-card shadow-xl overflow-hidden animate-slide-up relative">
+      <div class="p-6 border-b border-gray-200" id="upload-header">
+        <div class="flex items-center justify-between">
+          <h2 class="text-xl font-semibold flex items-center">
+            <svg class="w-6 h-6 mr-2 text-um-blue" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"/>
+            </svg>
+            Data Management
+          </h2>
+          <div class="flex items-center text-gray-600 hover:text-um-blue">
+            <span class="text-sm mr-2">Show/Hide</span>
+            <svg class="w-5 h-5 chevron-icon" id="chevron-icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <div class="upload-content expanded p-6" id="upload-content-section">
+        <div id="universal-upload-area" class="universal-upload-area mb-6">
+          <input type="file" id="universal-upload-input" multiple accept=".xlsx,.xls,.csv,.json,.umsess,application/octet-stream"/>
+          <div id="upload-content-normal" class="flex flex-col items-center justify-center">
+            <svg class="w-16 h-16 text-um-blue mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <p class="text-lg font-medium text-um-blue mb-2">Drag & Drop Files Here or Click to Upload</p>
+            <p class="text-sm text-gray-600">Supports MGIS Room/Occupant data (.xlsx, .csv), Custom Tags (.json), and Sessions (.umsess)</p>
+          </div>
+          <div id="upload-content-empty" class="hidden flex flex-col items-center justify-center">
+            <svg class="w-20 h-20 text-um-blue mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12"></path>
+            </svg>
+            <h3 class="text-xl font-bold text-um-blue mb-2">No Data Loaded</h3>
+            <p class="text-lg font-medium text-um-blue mb-3">Click Here or Drag Files to Get Started</p>
+            <p class="text-sm text-gray-600 mb-4">Upload MGIS room data files to begin searching and managing rooms</p>
+            <p class="text-xs text-gray-500">Supports MGIS Room/Occupant data (.xlsx, .csv), Custom Tags (.json), and Sessions (.umsess)</p>
+          </div>
+        </div>
+        <div id="processing-indicator" class="hidden flex items-center justify-center my-2">
+            <div class="animate-spin w-4 h-4 border border-um-blue border-t-transparent rounded-full mr-2"></div>
+            <span class="text-sm text-gray-600">Processing...</span>
+        </div>
+        <div id="uploaded-files-list" class="mt-3 text-xs text-gray-600 space-y-1"></div>
+
+        <div class="border-t pt-4 mt-6">
+          <h3 class="text-md font-medium text-um-blue mb-3">Export & Collaboration</h3>
+          <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+            <button id="export-tags-btn" disabled class="py-2 px-4 um-button-maize rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 button-press text-sm">
+              Export Custom Tags (.json)
+            </button>
+            <button id="export-session-btn" disabled class="py-2 px-4 um-button-blue rounded-lg shadow-md hover:shadow-lg disabled:opacity-50 button-press text-sm">
+              Export Session (.umsess)
+            </button>
+            <button id="collaboration-btn" class="py-2 px-4 um-button-blue rounded-lg shadow-md hover:shadow-lg button-press text-sm flex items-center justify-center gap-2">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+              </svg>
+              Join Workspace
+            </button>
+          </div>
+          
+          <!-- Collaboration Status -->
+          <div id="collaboration-status" class="hidden mt-4 p-3 bg-green-50 border border-green-200 rounded-lg">
+            <div class="flex items-start justify-between">
+              <div class="flex-grow">
+                <h4 class="font-medium text-green-800 mb-2 flex items-center gap-2">
+                  <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"/>
+                  </svg>
+                  Team Collaboration Active
+                </h4>
+                <p class="text-green-700 text-sm mb-2">Your custom tags will be shared with your team in real-time.</p>
+                <div id="online-users" class="space-y-1"></div>
+              </div>
+              <div class="ml-4 text-green-600">
+                <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div id="data-summary" class="hidden border-t pt-4 mt-6">
+          <h3 class="text-md font-medium text-um-blue mb-2">Loaded Data Summary</h3>
+          <div id="summary-content" class="text-sm text-gray-600 grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+        </div>
+
+        <div id="errors-container" class="hidden bg-red-50 border border-red-200 p-3 rounded-lg mt-4">
+          <h3 class="text-sm font-medium text-red-800">Errors</h3>
+          <ul id="errors-list" class="text-xs text-red-700 space-y-1 mt-1"></ul>
+        </div>
+      </div>
+    </div>
+
+    <div class="flex-grow flex flex-col um-card shadow-xl overflow-hidden animate-fade-in">
+      <div class="p-6 border-b border-gray-200">
+        <h2 class="text-2xl font-semibold mb-4">Room Search</h2>
+        <div id="desktop-search-section" class="grid-cols-1 lg:grid-cols-12 gap-4">
+            <div class="lg:col-span-4">
+                <label for="search-input" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <div class="search-container">
+                    <div class="search-icon"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
+                    <form id="search-form" class="m-0 p-0">
+                        <input type="text" id="search-input" placeholder="Search rooms, types, staff... Try 'Building: [name]'" class="search-input" disabled autocomplete="off" aria-autocomplete="list"/>
+                        <div id="autocomplete-container" role="listbox" class="absolute z-50 w-full mt-1 bg-white shadow-lg rounded-lg border border-gray-200 hidden max-h-60 overflow-y-auto"></div>
+                    </form>
+                </div>
+                 <p class="text-xs text-gray-500 mt-1">Patterns: Building: MOTT, Floor: 3, Category: clinical, Color: blue</p>
+            </div>
+            <div class="lg:col-span-2">
+                <label for="building-filter" class="block text-sm font-medium text-gray-700 mb-1">Building</label>
+                <select id="building-filter" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                    <option value="">All Buildings</option>
+                </select>
+            </div>
+            <div class="lg:col-span-2">
+                <label for="floor-filter" class="block text-sm font-medium text-gray-700 mb-1">Floor</label>
+                <select id="floor-filter" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                    <option value="">All Floors</option>
+                </select>
+            </div>
+            <div class="lg:col-span-2">
+                <label for="tag-filter" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                <select id="tag-filter" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                    <option value="">Add Filter</option>
+                </select>
+            </div>
+            <div class="lg:col-span-2">
+                <label for="results-per-page" class="block text-sm font-medium text-gray-700 mb-1">Show</label>
+                <select id="results-per-page" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                    <option value="10">10</option>
+                    <option value="25">25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                    <option value="0">All</option>
+                </select>
+            </div>
+        </div>
+
+        <div id="mobile-search-section" class="search-grid-mobile space-y-4">
+            <div>
+                <label for="search-input-mobile" class="block text-sm font-medium text-gray-700 mb-1">Search</label>
+                <div class="search-container">
+                    <div class="search-icon"><svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg></div>
+                    <input type="text" id="search-input-mobile" placeholder="Search rooms, types, staff..." class="search-input" disabled autocomplete="off"/>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="building-filter-mobile" class="block text-sm font-medium text-gray-700 mb-1">Building</label>
+                    <select id="building-filter-mobile" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                        <option value="">All Buildings</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="floor-filter-mobile" class="block text-sm font-medium text-gray-700 mb-1">Floor</label>
+                    <select id="floor-filter-mobile" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                        <option value="">All Floors</option>
+                    </select>
+                </div>
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label for="tag-filter-mobile" class="block text-sm font-medium text-gray-700 mb-1">Category</label>
+                    <select id="tag-filter-mobile" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                        <option value="">Add Filter</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="results-per-page-mobile" class="block text-sm font-medium text-gray-700 mb-1">Show</label>
+                    <select id="results-per-page-mobile" disabled class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-3 px-4">
+                        <option value="10">10</option>
+                        <option value="25">25</option>
+                        <option value="50">50</option>
+                        <option value="0">All</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <div id="active-tags-container" class="mt-3 flex flex-wrap gap-2 hidden">
+            <span class="text-sm text-gray-600 mr-2">Active filters:</span>
+            <button id="clear-tags-btn" class="text-xs text-gray-500 hover:text-red-600 px-2 py-1 rounded-full hover:bg-red-50">Clear all</button>
+        </div>
+      </div>
+
+      <div class="flex-grow overflow-auto">
+          <table id="results-table" class="min-w-full divide-y divide-gray-200"> <thead class="bg-gray-100 sticky top-0 z-10">
+              <tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Room</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tags</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Custom</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action</th>
+              </tr>
+            </thead>
+            <tbody id="results-body" class="bg-white divide-y divide-gray-200"></tbody>
+          </table>
+
+          <div id="mobile-results" class="p-4"></div>
+          <div id="empty-state" class="hidden flex items-center justify-center h-full text-center text-gray-500 p-10">
+             <div>
+               <svg class="mx-auto h-16 w-16 text-um-gray-medium mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+               </svg>
+               <h3 class="text-xl font-medium text-um-blue mb-2">No rooms match your search</h3>
+               <p class="text-gray-600">Try adjusting your filters or search terms.</p>
+             </div>
+          </div>
+      </div>
+
+      <div id="results-footer" class="border-t border-gray-200 px-6 py-3 bg-gray-50 hidden">
+          <div class="flex items-center justify-between">
+            <span id="results-count" class="text-sm text-gray-600">Showing 0 rooms</span>
+            <div id="pagination-controls" class="pagination-controls flex items-center space-x-2 text-sm text-gray-600">
+                <button id="prev-page-btn" class="">&lt; Prev</button>
+                <span id="page-info">Page 1 of 1</span>
+                <button id="next-page-btn" class="">Next &gt;</button>
+            </div>
+          </div>
+      </div>
+    </div>
+</main>
+
+  <!-- NEW WORKSPACE COLLABORATION MODALS -->
+  
+  <!-- Workspace Selection Modal -->
+  <div id="workspace-selection-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-md w-full mx-4 p-6 animate-scale-in">
+      <div class="text-center mb-6">
+        <div class="mx-auto w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center mb-4">
+          <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+          </svg>
+        </div>
+        <h3 class="text-xl font-bold text-um-blue mb-2">Team Collaboration</h3>
+        <p class="text-gray-600 text-sm">Join a workspace to share tags with your team in real-time</p>
+      </div>
+
+      <div class="space-y-3">
+        <button id="create-workspace-btn" class="w-full py-3 px-4 um-button-blue font-medium rounded-lg shadow-lg button-press flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+          </svg>
+          Create New Workspace
+        </button>
+        
+        <button id="join-workspace-btn" class="w-full py-3 px-4 um-button-maize font-medium rounded-lg shadow-lg button-press flex items-center justify-center gap-2">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"/>
+          </svg>
+          Join Existing Workspace
+        </button>
+      </div>
+
+      <button id="close-workspace-selection-btn" class="absolute top-4 right-4 text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+    </div>
+  </div>
+
+  <!-- Create Workspace Modal -->
+  <div id="create-workspace-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-lg w-full mx-4 p-6 animate-scale-in">
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex">
+          <svg class="w-6 h-6 text-green-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"/>
+          </svg>
+          <div>
+            <h3 class="text-lg font-semibold text-um-blue mb-2">Create New Workspace</h3>
+            <p class="text-sm text-gray-600">Create a secure workspace for your team to collaborate on room tagging.</p>
+          </div>
+        </div>
+        <button id="close-create-workspace-btn" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+
+      <div class="bg-green-50 border border-green-200 rounded-lg p-4 mb-4">
+        <h4 class="font-semibold text-green-800 mb-2">How It Works</h4>
+        <ul class="text-sm text-green-700 space-y-1 list-disc list-inside">
+          <li>You'll be the workspace owner</li>
+          <li>Share the workspace name and password with your team</li>
+          <li>Everyone in the workspace shares tags in real-time</li>
+          <li>Tags are saved securely on the server</li>
+        </ul>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label for="new-workspace-name" class="block text-sm font-medium text-gray-700 mb-1">
+            Workspace Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" id="new-workspace-name" 
+                 placeholder="e.g., Michigan Medicine Team" 
+                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-2 px-3"
+                 required />
+          <p class="text-xs text-gray-500 mt-1">Choose a name your team will recognize</p>
+        </div>
+        
+        <div>
+          <label for="new-workspace-password" class="block text-sm font-medium text-gray-700 mb-1">
+            Password <span class="text-red-500">*</span>
+          </label>
+          <input type="password" id="new-workspace-password" 
+                 placeholder="Create a secure password" 
+                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-2 px-3"
+                 required />
+          <p class="text-xs text-gray-500 mt-1">Share this password with your team members</p>
+        </div>
+
+        <div>
+          <label for="workspace-creator-name" class="block text-sm font-medium text-gray-700 mb-1">
+            Your Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" id="workspace-creator-name" 
+                 placeholder="Your display name" 
+                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-2 px-3"
+                 required />
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mt-6">
+        <button id="create-workspace-cancel-btn" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+          Cancel
+        </button>
+        <button id="create-workspace-confirm-btn" class="px-6 py-2 um-button-blue font-medium rounded-lg shadow-lg button-press">
+          Create Workspace
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Join Workspace Modal -->
+  <div id="join-workspace-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-lg w-full mx-4 p-6 animate-scale-in">
+      <div class="flex items-start justify-between mb-4">
+        <div class="flex">
+          <svg class="w-6 h-6 text-blue-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013 3v1"/>
+          </svg>
+          <div>
+            <h3 class="text-lg font-semibold text-um-blue mb-2">Join Workspace</h3>
+            <p class="text-sm text-gray-600">Enter the workspace details provided by your team leader.</p>
+          </div>
+        </div>
+        <button id="close-join-workspace-btn" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
+        <h4 class="font-semibold text-blue-800 mb-2">Joining a Workspace</h4>
+        <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside">
+          <li>Get the workspace name and password from your team leader</li>
+          <li>You'll instantly see all shared tags</li>
+          <li>Your tags will be shared with the team in real-time</li>
+          <li>You can leave the workspace anytime</li>
+        </ul>
+      </div>
+
+      <div class="space-y-4">
+        <div>
+          <label for="join-workspace-name" class="block text-sm font-medium text-gray-700 mb-1">
+            Workspace Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" id="join-workspace-name" 
+                 placeholder="Enter workspace name" 
+                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-2 px-3"
+                 required />
+        </div>
+        
+        <div>
+          <label for="join-workspace-password" class="block text-sm font-medium text-gray-700 mb-1">
+            Password <span class="text-red-500">*</span>
+          </label>
+          <input type="password" id="join-workspace-password" 
+                 placeholder="Enter workspace password" 
+                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-2 px-3"
+                 required />
+        </div>
+
+        <div>
+          <label for="join-user-name" class="block text-sm font-medium text-gray-700 mb-1">
+            Your Name <span class="text-red-500">*</span>
+          </label>
+          <input type="text" id="join-user-name" 
+                 placeholder="Your display name" 
+                 class="w-full rounded-lg border-gray-300 shadow-sm focus:border-um-blue focus:ring-um-blue py-2 px-3"
+                 required />
+        </div>
+      </div>
+
+      <div class="flex justify-between items-center mt-6">
+        <button id="join-workspace-cancel-btn" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+          Cancel
+        </button>
+        <button id="join-workspace-confirm-btn" class="px-6 py-2 um-button-blue font-medium rounded-lg shadow-lg button-press">
+          Join Workspace
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- OTHER EXISTING MODALS -->
+
+  <div id="mgis-compliance-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-2xl w-full mx-4 p-6 animate-scale-in">
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex">
+                <svg class="w-8 h-8 text-red-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 15.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+                <div>
+                    <h3 class="text-xl font-semibold text-red-600 mb-2">MGIS Compliance Required</h3>
+                    <p class="text-sm text-gray-600 mb-3">You are about to export session data containing MGIS information. Please review these important guidelines:</p>
+                </div>
+            </div>
+            <button id="close-mgis-modal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+
+        <div class="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+            <h4 class="font-semibold text-red-800 mb-3">MGIS Access Use and Sharing Guidelines</h4>
+            <ul class="text-sm text-red-700 space-y-2 mb-4">
+                <li class="flex items-start"><span class="text-red-600 mr-2 font-bold">•</span><span><strong>University use only:</strong> MGIS data is restricted to University employees for official work</span></li>
+                <li class="flex items-start"><span class="text-red-600 mr-2 font-bold">•</span><span><strong>No external sharing:</strong> Do not share with external groups or non-university personnel</span></li>
+                <li class="flex items-start"><span class="text-red-600 mr-2 font-bold">•</span><span><strong>Confidentiality required:</strong> Maintain highest standards of confidentiality and non-disclosure</span></li>
+                <li class="flex items-start"><span class="text-red-600 mr-2 font-bold">•</span><span><strong>Authorized work only:</strong> Use only for official, authorized university business</span></li>
+                <li class="flex items-start"><span class="text-red-600 mr-2 font-bold">•</span><span><strong>Floor plan restrictions:</strong> CAD/GDB formats may not be shared externally</span></li>
+            </ul>
+            <p class="text-xs text-red-600 font-medium">
+                Full guidelines: <a href="https://docs.google.com/document/d/12Z9Cwa78V2ab3Vbzc6ZTX-IqB7Czw8vowlEsTpvKnSI/edit" target="_blank" class="underline">MGIS Access Use and Sharing Guidelines</a>
+            </p>
+        </div>
+
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+            <h4 class="font-semibold text-blue-800 mb-2">Session Export Information</h4>
+            <p class="text-sm text-blue-700 mb-2">The exported session file (.umsess) contains:</p>
+            <ul class="text-sm text-blue-700 space-y-1 list-disc list-inside ml-4">
+                <li>Room data from MGIS exports</li>
+                <li>Custom tags and annotations you've created</li>
+                <li>Staff/occupant information (if uploaded)</li>
+                <li>Search and filter configurations</li>
+            </ul>
+            <p class="text-xs text-blue-600 mt-2 font-medium">File is compressed and encoded for security, but still contains sensitive university data.</p>
+        </div>
+
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+            <label class="flex items-start text-sm text-gray-600">
+                <input type="checkbox" id="mgis-compliance-checkbox" class="mr-2 mt-0.5 focus:ring-um-blue text-um-blue">
+                <span>I understand and agree to comply with MGIS Access Use and Sharing Guidelines. I will only use this data for authorized university business and will not share it with external parties.</span>
+            </label>
+            <div class="flex gap-2">
+                <button id="mgis-cancel-btn" class="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50">
+                    Cancel
+                </button>
+                <button id="mgis-export-confirm-btn" disabled class="px-4 py-2 um-button-blue font-medium rounded-lg shadow-lg button-press disabled:opacity-50">
+                    Export Session
+                </button>
+            </div>
+        </div>
+    </div>
+  </div>
+
+  <div id="security-reminder-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-lg w-full mx-4 p-6 animate-scale-in">
+        <div class="flex items-start justify-between mb-4">
+            <div class="flex">
+                <svg class="w-6 h-6 text-yellow-500 mr-3 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.5 0L4.268 15.5c-.77.833.192 2.5 1.732 2.5z"/>
+                </svg>
+                <div>
+                    <h3 class="text-lg font-semibold text-um-blue mb-2">Security Reminder</h3>
+                    <p class="text-sm text-gray-600 mb-3">Data upload successful! Please follow these security practices:</p>
+                </div>
+            </div>
+            <button id="close-security-modal" class="text-gray-400 hover:text-gray-600 text-xl">&times;</button>
+        </div>
+
+        <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-4">
+            <ul class="text-sm text-gray-700 space-y-2">
+                <li class="flex items-start"><span class="text-red-600 mr-2">•</span><span><strong>Delete MGIS source files</strong> from your computer after upload</span></li>
+                <li class="flex items-start"><span class="text-orange-600 mr-2">•</span><span><strong>Custom tag files are safer</strong> to keep (no building layouts)</span></li>
+                <li class="flex items-start"><span class="text-blue-600 mr-2">•</span><span><strong>Refreshing this page</strong> will require re-uploading all files</span></li>
+                <li class="flex items-start"><span class="text-purple-600 mr-2">•</span><span><strong>Do not share</strong> this application outside your department</span></li>
+            </ul>
+        </div>
+
+        <div class="flex justify-between items-center">
+            <label class="flex items-center text-sm text-gray-600">
+                <input type="checkbox" id="dont-show-security-again" class="mr-2 focus:ring-um-blue text-um-blue">
+                Don't show this reminder again
+            </label>
+            <button id="security-ok-btn" class="px-4 py-2 um-button-blue font-medium rounded-lg shadow-lg button-press">
+                Understood
+            </button>
+        </div>
+    </div>
+  </div>
+
+  <div id="welcome-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-4xl w-full mx-4 p-8 animate-scale-in">
+        <div class="flex items-start justify-between mb-6">
+            <div>
+                <h3 class="text-2xl font-bold text-um-blue mb-2">Welcome to the Collaborative Hospital Directory</h3>
+                <p class="text-gray-600">Enhanced room management with real-time team collaboration - UMich Version.</p>
+            </div>
+            <button id="close-welcome-btn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <div class="grid md:grid-cols-2 gap-8 mb-8">
+            <div>
+                <h4 class="font-semibold text-um-blue mb-3">🔒 Secure Data Handling</h4>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-1 mb-4">
+                    <li>Upload MGIS-exported files directly</li>
+                    <li>No data stored permanently</li>
+                    <li>Automatic room code translation</li>
+                    <li>Multiple building support</li>
+                </ul>
+                <h4 class="font-semibold text-um-blue mb-3">📋 Data Requirements</h4>
+                <p class="text-sm text-gray-600">Upload Excel or CSV files from MGIS containing room numbers, types, departments, and floor information. Upload JSON files for custom tags.</p>
+            </div>
+            <div>
+                <h4 class="font-semibold text-green-600 mb-3">🤝 NEW: Team Collaboration</h4>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-2 mb-4">
+                    <li>Share custom tags with your team in real-time</li>
+                    <li>See who's online and working on rooms</li>
+                    <li>Instant notifications for tag changes</li>
+                    <li>Persistent team workspace</li>
+                </ul>
+                <h4 class="font-semibold text-um-blue mb-3">🔧 Enhanced Features</h4>
+                <ul class="list-disc list-inside text-sm text-gray-600 space-y-2 mb-4">
+                    <li>Advanced search with room code expansion</li>
+                    <li>Custom tagging (cameras, security, etc.)</li>
+                    <li>Multi-building and floor filtering</li>
+                    <li>Direct MGIS integration links</li>
+                </ul>
+                <h4 class="font-semibold text-red-600 mb-3">⚠️ MGIS Compliance</h4>
+                <p class="text-sm text-red-700 bg-red-50 p-3 rounded-lg">
+                    <strong>Important:</strong> MGIS data is for university employees only. Do not share with external groups or use for non-university business. Review MGIS Access Guidelines before use.
+                </p>
+            </div>
+        </div>
+        <div class="flex justify-between items-center">
+            <label class="flex items-center text-sm text-gray-600"><input type="checkbox" id="dont-show-again" class="mr-2 focus:ring-um-blue text-um-blue">Don't show this again</label>
+            <button id="welcome-ok-btn" class="px-6 py-3 um-button-blue font-medium rounded-lg shadow-lg button-press">Get Started!</button>
+        </div>
+    </div>
+  </div>
+
+  <div id="tag-info-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-2xl w-full mx-4 p-6 animate-scale-in">
+        <div class="flex items-center justify-between mb-4">
+            <h3 class="text-xl font-semibold text-um-blue" id="tag-info-title">Tag Information</h3>
+            <button id="close-tag-info-btn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <div class="tag-info-content max-h-[60vh] overflow-y-auto" id="tag-info-content">
+            </div>
+    </div>
+  </div>
+
+  <div id="custom-tag-modal" class="fixed inset-0 um-modal-backdrop flex items-center justify-center z-50 hidden">
+    <div class="um-modal-content max-w-2xl w-full mx-4 p-6 animate-scale-in">
+        <div class="flex items-center justify-between mb-6">
+            <h3 class="text-xl font-semibold text-um-blue">Add/Edit Custom Tags</h3>
+            <button id="close-modal-btn" class="text-gray-400 hover:text-gray-600 text-2xl">&times;</button>
+        </div>
+        <div class="mb-6">
+            <p id="modal-room-info" class="text-sm text-gray-600 mb-4 p-3 bg-gray-50 rounded-lg"></p>
+
+            <div class="bg-um-blue-light border border-um-blue rounded-lg p-4 mb-4">
+                <h4 class="font-medium text-um-blue mb-3">Create Rich Tag</h4>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <input type="text" id="tag-name-input" placeholder="Tag name (e.g., 'Security Camera')" class="rounded-lg border-gray-300 shadow-sm focus:ring-um-blue focus:border-um-blue"/>
+                    <select id="tag-type-select" class="rounded-lg border-gray-300 shadow-sm focus:ring-um-blue focus:border-um-blue">
+                        <option value="simple">Simple Info</option>
+                        <option value="info">Detailed Info</option>
+                        <option value="security">Security</option>
+                        <option value="equipment">Equipment</option>
+                        <option value="contact">Contact</option>
+                         <option value="note">Note</option>
+                    </select>
+                </div>
+                <textarea id="tag-description-input" placeholder="Description or additional information..." rows="3" class="w-full rounded-lg border-gray-300 shadow-sm mb-3 focus:ring-um-blue focus:border-um-blue"></textarea>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-3">
+                    <input type="url" id="tag-link-input" placeholder="Related link (optional)" class="rounded-lg border-gray-300 shadow-sm focus:ring-um-blue focus:border-um-blue"/>
+                    <input type="text" id="tag-contact-input" placeholder="Contact info (optional)" class="rounded-lg border-gray-300 shadow-sm focus:ring-um-blue focus:border-um-blue"/>
+                </div>
+                <div class="mb-3">
+                    <input type="url" id="tag-image-input" placeholder="Image URL (optional)" class="w-full rounded-lg border-gray-300 shadow-sm focus:ring-um-blue focus:border-um-blue"/>
+                    <div id="image-preview-container" class="mt-2 hidden">
+                        <img id="image-preview" class="image-preview max-w-[200px] max-h-[150px] rounded-lg" alt="Tag image preview" />
+                    </div>
+                </div>
+                <div class="mb-3">
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Tag Color</label>
+                    <div class="color-picker">
+                        <div class="color-option tag-blue selected" data-color="blue"></div>
+                        <div class="color-option tag-maize" data-color="maize"></div>
+                        <div class="color-option tag-gray" data-color="gray"></div>
+                        <div class="color-option tag-lightblue" data-color="lightblue"></div>
+                        <div class="color-option tag-green" data-color="green"></div>
+                        <div class="color-option tag-red" data-color="red"></div>
+                        <div class="color-option tag-orange" data-color="orange"></div>
+                        <div class="color-option tag-purple" data-color="purple"></div>
+                    </div>
+                </div>
+                
+                <!-- 🎯 NEW: WORKSPACE SHARING OPTION -->
+                <div class="mb-3" id="workspace-sharing-option" style="display: none;">
+                    <div class="flex items-center p-3 bg-green-50 border border-green-200 rounded-lg">
+                        <input type="checkbox" id="share-to-workspace-checkbox" class="mr-3 focus:ring-um-blue text-um-blue" checked>
+                        <div class="flex-grow">
+                            <label for="share-to-workspace-checkbox" class="flex items-center cursor-pointer">
+                                <svg class="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
+                                </svg>
+                                <span class="font-medium text-green-800">Share with workspace: </span>
+                                <span id="workspace-name-display" class="font-bold text-green-900 ml-1">[Workspace Name]</span>
+                            </label>
+                            <p class="text-sm text-green-700 mt-1 ml-7">Team members will see this tag in real-time</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="flex space-x-3">
+                    <button id="add-rich-tag-btn" class="px-4 py-2 um-button-blue text-sm font-medium rounded-lg button-press">Add Tag</button>
+                    </div>
+            </div>
+
+            <div id="custom-tags-list-modal" class="space-y-2 max-h-48 overflow-y-auto p-2 bg-gray-50 rounded-lg min-h-[100px]"></div>
+        </div>
+        <div class="flex justify-end">
+            <button id="save-tags-btn" class="px-6 py-3 um-button-blue font-medium rounded-lg button-press">Save Changes</button>
+        </div>
+    </div>
+  </div>
+
+  <template id="mobile-card-template">
+    <div class="room-card">
+      <div class="room-card-header">
+        <div class="room-card-avatar" data-content="room-avatar"></div>
+        <div class="flex-grow">
+          <div class="room-card-title flex items-center">
+            <span class="building-indicator" data-content="building-indicator"></span>
+            <span data-content="rmnbr"></span>
+          </div>
+          <div class="room-card-subtitle" data-content="floor-building"></div>
+        </div>
+      </div>
+      <div class="mb-3">
+        <div class="text-sm font-medium text-gray-900 mb-1" data-content="typeFull"></div>
+        <div class="text-sm text-gray-500" data-content="dept_descr"></div>
+      </div>
+      <div class="mb-3">
+        <div class="text-xs font-medium text-gray-600 mb-1">Tags:</div>
+        <div class="flex flex-wrap gap-1" data-container="tags"></div>
+      </div>
+      <div class="mb-3">
+        <div class="text-xs font-medium text-gray-600 mb-1">Custom:</div>
+        <div class="flex flex-wrap gap-1" data-container="staff-custom-tags"></div>
+      </div>
+      <div class="room-card-actions">
+        <a href="#" target="_blank" rel="noopener noreferrer" class="um-button-blue button-press mobile-touch-target" data-action="map-link">MGIS</a>
+        <button class="um-button-maize button-press mobile-touch-target" data-action="add-tag">Tags</button>
+      </div>
+    </div>
+  </template>
+
+  <template id="row-template">
+    <tr class="hover:bg-um-maize-light transition-colors duration-150">
+      <td class="px-6 py-3 whitespace-nowrap">
+        <div class="flex items-center">
+          <div class="flex-shrink-0 h-8 w-8 rounded-full bg-um-blue flex items-center justify-center text-white font-bold text-xs" data-content="room-avatar"></div>
+          <div class="ml-3">
+            <div class="text-sm font-medium text-gray-900 flex items-center">
+              <span class="building-indicator" data-content="building-indicator"></span>
+              <span data-content="rmnbr"></span>
+            </div>
+            <div class="text-xs text-gray-500" data-content="floor"></div>
+          </div>
+        </div>
+      </td>
+      <td class="px-6 py-3"><div class="text-sm text-gray-900" data-content="typeFull"></div></td>
+      <td class="px-6 py-3"><div class="text-sm text-gray-500" data-content="dept_descr"></div></td>
+      <td class="px-6 py-3"><div class="flex flex-wrap gap-1" data-container="tags"></div></td>
+      <td class="px-6 py-3"><div class="flex flex-wrap gap-1" data-container="staff-custom-tags"></div></td>
+      <td class="px-6 py-3 whitespace-nowrap">
+        <div class="flex space-x-2">
+          <a href="#" target="_blank" rel="noopener noreferrer" class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded text-white um-button-blue button-press" data-action="map-link">MGIS</a>
+          <button class="inline-flex items-center px-2.5 py-1.5 border border-transparent text-xs font-medium rounded um-button-maize button-press add-tag-button" data-action="add-tag">Tags</button>
+        </div>
+      </td>
+    </tr>
+  </template>
+  <template id="tag-span-template"><span class="tag-pill"></span></template>
+  <template id="autocomplete-item-template"><div role="option" class="autocomplete-item p-2 hover:bg-um-maize-light cursor-pointer rounded"></div></template>
+  <template id="active-tag-template">
+    <span class="active-tag-pill">
+      <span data-content="tag-name"></span>
+      <button class="remove-tag-btn ml-2 text-um-blue hover:text-red-600" data-action="remove-tag">
+        <svg fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd"/></svg>
+      </button>
+    </span>
+  </template>
+  <template id="custom-tag-item-template">
+    <span class="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium border"> <span data-content="tag-name"></span>
+      <button class="ml-2 inline-flex" data-action="remove-custom-tag">&times;</button> </span>
+  </template>
+
+  <script src="config.js"></script>
+  <script src="state.js"></script>
+  <script src="utils.js"></script>
+  <script src="ui.js"></script>
+  <script src="data.js"></script>
+  <script src="supabase-config.js"></script>
+  <script src="app.js"></script>
+
+</body>
+</html>
