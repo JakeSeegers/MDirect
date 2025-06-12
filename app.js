@@ -142,7 +142,7 @@ async function createWorkspace() {
     try {
         showLoading(true);
         
-        const result = await window.workspaceCollaboration.createWorkspace(workspaceName, password, creatorName);
+        const result = await joinWorkspaceWithCache(workspaceName, password, userName);
         
         if (result.success) {
             hideCreateWorkspaceModal();
@@ -181,7 +181,7 @@ async function joinWorkspace() {
     try {
         showLoading(true);
         
-        const result = await window.workspaceCollaboration.joinWorkspace(workspaceName, password, userName);
+        const result = await joinWorkspaceWithCache(workspaceName, password, userName);
         
         if (result.success) {
             hideJoinWorkspaceModal();
@@ -776,6 +776,9 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Initialize workspace collaboration
     initializeWorkspaceCollaboration();
+    
+    // 🎯 ADD THIS LINE RIGHT HERE:
+    initializeCacheSystem();
     
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {

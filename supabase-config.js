@@ -297,39 +297,118 @@ async function saveTagToWorkspace(roomId, tagObject) {
     }
 }
 
-// Remove tag from workspace
+// Remove tag from workspace (COMPREHENSIVE FIX)
 async function removeTagFromWorkspace(roomId, tagObject) {
-    if (!supabaseClient || !collaborationState.currentWorkspace) return false;
+    if (!supabaseClient || !collaborationState.currentWorkspace) {
+        console.error('❌ Missing supabaseClient or workspace');
+        return false;
+    }
     
     try {
-        const room = state.processedData.find(r => r.id === roomId);
-        if (!room) return false;
+        console.log('🔄 Starting tag removal process...', {
+            roomId,
+            tagName: tagObject.name,
+            workspace: collaborationState.currentWorkspace.name
+        });
         
-        const { error } = await supabaseClient
+        // 🎯 FIXED: Use the same type-safe comparison as saveTagToWorkspace
+        const room = state.processedData.find(r => r.id.toString() === roomId.toString());
+        if (!room) {
+            console.error('❌ Room not found for ID:', roomId);
+            console.log('🔍 Available room IDs (first 10):', state.processedData.slice(0, 10).map(r => ({ id: r.id, type: typeof r.id })));
+            return false;
+        }
+        
+        const roomIdentifier = room.rmrecnbr || room.id;
+        
+        console.log('🔍 Attempting to delete tag from database:', {
+            workspace_id: collaborationState.currentWorkspace.id,
+            room_identifier: roomIdentifier,
+            tag_name: tagObject.name
+        });
+        
+        // First, let's verify the row exists and is visible
+        const { data: existingTags, error: selectError } = await supabaseClient
+            .from('workspace_tags')
+            .select('*')
+            .eq('workspace_id', collaborationState.currentWorkspace.id)
+            .eq('room_identifier', roomIdentifier)
+            .eq('tag_name', tagObject.name);
+            
+        if (selectError) {
+            console.error('❌ Error checking for existing tag:', selectError);
+            throw selectError;
+        }
+        
+        if (!existingTags || existingTags.length === 0) {
+            console.warn('⚠️ Tag not found in database - may already be deleted:', {
+                workspace_id: collaborationState.currentWorkspace.id,
+                room_identifier: roomIdentifier,
+                tag_name: tagObject.name
+            });
+            return true; // Consider it successful if tag doesn't exist
+        }
+        
+        console.log('✅ Found existing tag(s) to delete:', existingTags);
+        
+        // Now perform the delete operation
+        const { data: deletedData, error: deleteError } = await supabaseClient
             .from('workspace_tags')
             .delete()
             .eq('workspace_id', collaborationState.currentWorkspace.id)
-            .eq('room_identifier', room.rmrecnbr || room.id)
-            .eq('tag_name', tagObject.name);
+            .eq('room_identifier', roomIdentifier)
+            .eq('tag_name', tagObject.name)
+            .select(); // Add .select() to return deleted rows
             
-        if (error) throw error;
+        if (deleteError) {
+            console.error('❌ Database delete error:', deleteError);
+            throw deleteError;
+        }
+        
+        console.log('✅ Delete operation result:', deletedData);
+        
+        if (!deletedData || deletedData.length === 0) {
+            console.error('❌ Delete operation returned no rows - this suggests an RLS policy issue');
+            console.log('🔍 Check your Supabase RLS policies for the workspace_tags table');
+            console.log('🔍 Ensure there is a SELECT policy that allows reading the rows you want to delete');
+            return false;
+        }
+        
+        console.log('✅ Successfully deleted from database:', deletedData);
         
         // Broadcast to other users
-        await collaborationState.activeChannel.send({
-            type: 'broadcast',
-            event: 'tag_removed',
-            payload: {
-                room_id: roomId,
-                tag_name: tagObject.name,
-                user: collaborationState.currentUser.name
-            }
-        });
+        if (collaborationState.activeChannel) {
+            const broadcastResult = await collaborationState.activeChannel.send({
+                type: 'broadcast',
+                event: 'tag_removed',
+                payload: {
+                    room_id: roomId,
+                    tag_name: tagObject.name,
+                    user: collaborationState.currentUser.name,
+                    timestamp: new Date().toISOString()
+                }
+            });
+            console.log('✅ Delete broadcast sent:', broadcastResult);
+        }
         
-        console.log('✅ Tag removed from workspace:', tagObject.name);
+        console.log('✅ Tag removed from workspace successfully:', tagObject.name);
         return true;
         
     } catch (error) {
         console.error('❌ Error removing tag from workspace:', error);
+        console.error('❌ Error details:', {
+            message: error.message,
+            code: error.code,
+            details: error.details,
+            hint: error.hint
+        });
+        
+        // Check for common RLS-related error codes
+        if (error.code === '42501' || error.message?.includes('policy')) {
+            console.error('🚨 This looks like a Row Level Security (RLS) policy issue!');
+            console.error('🔧 Fix: Check your Supabase RLS policies for workspace_tags table');
+        }
+        
         return false;
     }
 }
@@ -479,14 +558,15 @@ function sanitizeHTML(text) {
     return temp.innerHTML;
 }
 
-// Export functions
+// Export functions (FIXED WITH supabaseClient EXPOSURE)
 window.workspaceCollaboration = {
     initializeSupabase,
     createWorkspace,
     joinWorkspace,
     saveTagToWorkspace,
     removeTagFromWorkspace,
-    syncWorkspaceTags,  // ← THIS WAS MISSING BEFORE!
+    syncWorkspaceTags,
     leaveWorkspace,
-    collaborationState
+    collaborationState,
+    get supabaseClient() { return supabaseClient; }  // 🎯 ADDED: Expose supabaseClient for debugging
 };
