@@ -207,7 +207,7 @@ function numberToWord(num) {
 }
 
 /**
- * Calculate match score for a specific term against a room
+ * FIXED: Calculate match score for a specific term against a room
  */
 function calculateTermMatch(term, room, roomTags) {
     const termValue = term.value.toLowerCase();
@@ -225,26 +225,51 @@ function calculateTermMatch(term, room, roomTags) {
             break;
             
         case 'building':
-            if (room.building && room.building.toLowerCase().includes(termValue)) {
-                score = room.building.toLowerCase() === termValue ? 10 : 7;
-                matched = true;
-            } else if (room.bld_descrshort && room.bld_descrshort.toLowerCase().includes(termValue)) {
-                score = room.bld_descrshort.toLowerCase() === termValue ? 10 : 7;
-                matched = true;
+            // FIXED: Check both building fields with flexible matching
+            const buildingFields = [
+                room.building,
+                room.bld_descrshort
+            ].filter(Boolean);
+            
+            for (let buildingField of buildingFields) {
+                const buildingLower = buildingField.toLowerCase();
+                if (buildingLower === termValue) {
+                    score = 10; // Exact match
+                    matched = true;
+                    break;
+                } else if (buildingLower.includes(termValue) && termValue.length >= 2) {
+                    score = Math.max(score, 7); // Partial match
+                    matched = true;
+                } else if (termValue.includes(buildingLower) && buildingLower.length >= 2) {
+                    score = Math.max(score, 6); // Reverse partial match
+                    matched = true;
+                }
             }
             break;
             
         case 'department':
-            if (room.dept_descr && room.dept_descr.toLowerCase().includes(termValue)) {
-                score = room.dept_descr.toLowerCase() === termValue ? 10 : 6;
-                matched = true;
+            if (room.dept_descr) {
+                const deptLower = room.dept_descr.toLowerCase();
+                if (deptLower === termValue) {
+                    score = 10;
+                    matched = true;
+                } else if (deptLower.includes(termValue) && termValue.length >= 2) {
+                    score = 6;
+                    matched = true;
+                }
             }
             break;
             
         case 'room_type':
-            if (room.typeFull && room.typeFull.toLowerCase().includes(termValue)) {
-                score = room.typeFull.toLowerCase() === termValue ? 10 : 6;
-                matched = true;
+            if (room.typeFull) {
+                const typeLower = room.typeFull.toLowerCase();
+                if (typeLower === termValue) {
+                    score = 10;
+                    matched = true;
+                } else if (typeLower.includes(termValue) && termValue.length >= 2) {
+                    score = 6;
+                    matched = true;
+                }
             }
             break;
             
@@ -254,7 +279,7 @@ function calculateTermMatch(term, room, roomTags) {
                 if (roomNum === termValue) {
                     score = 15; // Highest score for exact room number
                     matched = true;
-                } else if (roomNum.includes(termValue)) {
+                } else if (roomNum.includes(termValue) && termValue.length >= 2) {
                     score = 8;
                     matched = true;
                 }
@@ -265,7 +290,7 @@ function calculateTermMatch(term, room, roomTags) {
             const staffTags = state.staffTags[room.id] || [];
             for (let staffTag of staffTags) {
                 const staffName = staffTag.replace('Staff: ', '').toLowerCase();
-                if (staffName.includes(termValue)) {
+                if (staffName.includes(termValue) && termValue.length >= 2) {
                     score = staffName === termValue ? 10 : 6;
                     matched = true;
                     break;
@@ -275,16 +300,20 @@ function calculateTermMatch(term, room, roomTags) {
             
         case 'general':
         default:
-            // Use existing tag-based matching for general terms
+            // FIXED: More flexible general term matching
             for (let tag of roomTags) {
-                if (tag === termValue) {
+                const tagLower = tag.toLowerCase();
+                if (tagLower === termValue) {
                     score = 8; // Exact match
                     matched = true;
                     break;
-                } else if (tag.includes(termValue) && termValue.length >= 3) {
+                } else if (tagLower.includes(termValue) && termValue.length >= 2) {
                     score = Math.max(score, 4); // Partial match
                     matched = true;
-                } else if (termValue.length >= 2 && tag.startsWith(termValue)) {
+                } else if (termValue.includes(tagLower) && tagLower.length >= 2) {
+                    score = Math.max(score, 3); // Reverse partial match  
+                    matched = true;
+                } else if (termValue.length >= 2 && tagLower.startsWith(termValue)) {
                     score = Math.max(score, 3); // Prefix match
                     matched = true;
                 }
@@ -326,7 +355,8 @@ async function processRoomData(data) {
              return;
         }
 
-        const building = row.bld_descrshort || 'Unknown Building';
+        // FIXED: Consistent building handling
+        const building = (row.bld_descrshort || row.building || 'Unknown Building').trim();
         buildings.add(building);
 
         const type = normalizeAbbreviation(row.rmtyp_descrshort, unmapped);
@@ -354,7 +384,8 @@ async function processRoomData(data) {
             dept_descr: normalizedDept, // Store the normalized department name
             tags: rowTags,
             mgisLink: generateMgisLink(row),
-            building: building
+            building: building, // FIXED: Always use the consistent building value
+            bld_descrshort: row.bld_descrshort || building // Keep original for reference
         });
     });
 
@@ -772,7 +803,7 @@ function createUnifiedTags(room) {
     return [...new Set(tags)]; // Remove duplicates
 }
 
-// Enhanced search that uses structured query processing
+// FIXED: Enhanced search that uses structured query processing
 function searchRoomsByTags(searchQuery) {
     if (!searchQuery || !state.processedData.length) {
         return [...state.processedData];
@@ -805,8 +836,10 @@ function searchRoomsByTags(searchQuery) {
             }
         });
         
-        // Require all terms to match for inclusion
-        const allTermsMatched = matchedTerms === processedTerms.length;
+        // FIXED: More flexible matching - require at least 70% of terms to match for inclusion
+        // For single term searches, require 100% match
+        const matchThreshold = processedTerms.length === 1 ? 1 : Math.ceil(processedTerms.length * 0.7);
+        const sufficientMatch = matchedTerms >= matchThreshold;
         
         // Boost score for exact room number matches
         if (processedTerms.some(t => t.type === 'room_number' && room.rmnbr && 
@@ -816,11 +849,11 @@ function searchRoomsByTags(searchQuery) {
         
         return {
             room,
-            score: allTermsMatched ? score : 0,
+            score: sufficientMatch ? score : 0,
             matchedTerms,
             totalTerms: processedTerms.length,
             matchDetails,
-            included: allTermsMatched
+            included: sufficientMatch
         };
     });
     
@@ -831,22 +864,35 @@ function searchRoomsByTags(searchQuery) {
         .map(result => result.room);
 }
 
-// Enhanced filter function - now uses enhanced search
+// FIXED: Simplified filter function that properly combines search and dropdown filters
 function data_getFilteredData() {
+    // Start with search results or all data if no search query
     let result = searchRoomsByTags(state.searchQuery);
     
-    // Apply dropdown filters (still supported for backward compatibility)
+    // FIXED: Apply dropdown filters AFTER search, not as a separate search
     if (state.activeFilters.building) {
-        result = result.filter(r => r.building === state.activeFilters.building);
+        result = result.filter(r => {
+            const roomBuilding = (r.building || r.bld_descrshort || '').toLowerCase();
+            const filterBuilding = state.activeFilters.building.toLowerCase();
+            return roomBuilding === filterBuilding;
+        });
     }
+    
     if (state.activeFilters.floor) {
         result = result.filter(r => String(r.floor) === String(state.activeFilters.floor));
     }
+    
+    // FIXED: Apply tag filters properly without re-running entire search
     if (state.activeFilters.tags.length > 0) {
-        // Convert active filter tags to search terms and apply enhanced search
-        const currentQuery = state.searchQuery;
-        const combinedQuery = [currentQuery, ...state.activeFilters.tags].filter(Boolean).join(' ');
-        result = searchRoomsByTags(combinedQuery);
+        result = result.filter(room => {
+            const roomTags = createUnifiedTags(room);
+            return state.activeFilters.tags.every(filterTag => {
+                return roomTags.some(roomTag => 
+                    roomTag.toLowerCase().includes(filterTag.toLowerCase()) ||
+                    filterTag.toLowerCase().includes(roomTag.toLowerCase())
+                );
+            });
+        });
     }
     
     state.currentFilteredData = result;
@@ -1023,3 +1069,144 @@ function handleAutocompleteKeydown(e) {
     }
     state.autocompleteActiveIndex = newIndex;
 }
+
+// ==================== DEBUGGING FUNCTIONS ====================
+
+// Debug search for a specific query
+function debugSearch(query) {
+    console.log(`🔍 Debugging search for: "${query}"`);
+    
+    const processedTerms = preprocessSearchQuery(query);
+    console.log('📝 Processed terms:', processedTerms);
+    
+    const results = searchRoomsByTags(query);
+    console.log(`📊 Found ${results.length} results`);
+    
+    // Show first few results with scoring details
+    const scoredResults = state.processedData.slice(0, 10).map(room => {
+        const roomTags = createUnifiedTags(room);
+        let score = 0;
+        let matchedTerms = 0;
+        
+        processedTerms.forEach(term => {
+            const matchResult = calculateTermMatch(term, room, roomTags);
+            if (matchResult.matched) {
+                score += matchResult.score * term.boost;
+                matchedTerms++;
+            }
+        });
+        
+        return {
+            room: `${room.rmnbr} - ${room.building}`,
+            score,
+            matchedTerms,
+            totalTerms: processedTerms.length,
+            tags: roomTags.slice(0, 10) // First 10 tags
+        };
+    });
+    
+    console.table(scoredResults);
+    return results;
+}
+
+// Debug building data consistency
+function debugBuildings() {
+    console.log('🏢 Building Debug Info:');
+    
+    const buildingData = state.processedData.slice(0, 20).map(room => ({
+        room: room.rmnbr,
+        building: room.building,
+        bld_descrshort: room.bld_descrshort,
+        consistent: room.building === room.bld_descrshort
+    }));
+    
+    console.table(buildingData);
+    
+    console.log('🏢 Available Buildings:', state.availableBuildings);
+    console.log('🏢 Building Colors:', state.buildingColors);
+}
+
+// Debug tags for a specific room
+function debugRoomTags(roomNumber) {
+    const room = state.processedData.find(r => r.rmnbr.toString() === roomNumber.toString());
+    if (!room) {
+        console.log(`❌ Room ${roomNumber} not found`);
+        return;
+    }
+    
+    console.log(`🏠 Debug tags for room ${roomNumber}:`);
+    console.log('📍 Room data:', {
+        id: room.id,
+        rmnbr: room.rmnbr,
+        building: room.building,
+        bld_descrshort: room.bld_descrshort,
+        floor: room.floor,
+        typeFull: room.typeFull,
+        dept_descr: room.dept_descr
+    });
+    
+    const unifiedTags = createUnifiedTags(room);
+    console.log('🏷️ Unified tags:', unifiedTags);
+    
+    const customTags = state.customTags[room.id] || [];
+    const staffTags = state.staffTags[room.id] || [];
+    console.log('🏷️ Custom tags:', customTags);
+    console.log('👥 Staff tags:', staffTags);
+}
+
+// Debug current filter state
+function debugFilters() {
+    console.log('🔧 Current Filter State:');
+    console.log('🔍 Search Query:', state.searchQuery);
+    console.log('🏢 Building Filter:', state.activeFilters.building);
+    console.log('🏢 Floor Filter:', state.activeFilters.floor);
+    console.log('🏷️ Tag Filters:', state.activeFilters.tags);
+    
+    const totalData = state.processedData.length;
+    const filteredData = state.currentFilteredData.length;
+    
+    console.log(`📊 Data: ${filteredData}/${totalData} rooms shown`);
+    
+    if (filteredData < 20) {
+        console.log('📋 Current filtered rooms:');
+        console.table(state.currentFilteredData.map(r => ({
+            room: r.rmnbr,
+            building: r.building,
+            floor: r.floor,
+            type: r.typeFull
+        })));
+    }
+}
+
+// Test search for common patterns
+function testSearchPatterns() {
+    const testQueries = [
+        'mott',
+        'floor 3',
+        'building mott',
+        'office',
+        'exam room',
+        '3rd floor',
+        'cardiovascular'
+    ];
+    
+    console.log('🧪 Testing search patterns:');
+    
+    testQueries.forEach(query => {
+        const results = searchRoomsByTags(query);
+        console.log(`"${query}" → ${results.length} results`);
+        
+        if (results.length > 0 && results.length < 5) {
+            results.forEach(r => {
+                console.log(`  📍 ${r.rmnbr} - ${r.building} - ${r.typeFull}`);
+            });
+        }
+    });
+}
+
+// Make these functions globally available for debugging
+window.debugSearch = debugSearch;
+window.debugBuildings = debugBuildings;
+window.debugRoomTags = debugRoomTags;
+window.debugFilters = debugFilters;
+window.testSearchPatterns = testSearchPatterns;
