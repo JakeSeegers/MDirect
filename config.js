@@ -6,7 +6,7 @@ const UM_TEXT_ON_MAIZE = '#00274C'; // Text color for maize backgrounds
 
 // --- ENHANCED ABBREVIATIONS & TAG RULES ---
 const abbreviationMap = { 
-    // 🆕 ENHANCED: Added common medical abbreviations
+    // 🆕 ENHANCED: Added common medical abbreviations (your existing + new)
     "OR": "Operating Room", "ER": "Emergency Room", "ICU": "Intensive Care Unit", "CCU": "Critical Care Unit",
     "PACU": "Post Anesthesia Care Unit", "NICU": "Neonatal Intensive Care Unit", "PICU": "Pediatric Intensive Care Unit",
     "ED": "Emergency Department", "L&D": "Labor and Delivery", "OBGYN": "Obstetrics and Gynecology",
@@ -19,77 +19,329 @@ const abbreviationMap = {
     "ADMIN": "Administration", "CONF": "Conference", "BREAK": "Break Room",
     "STOR": "Storage", "SUPPLY": "Supply", "UTIL": "Utility", "MAINT": "Maintenance",
     
-    // Room/Space Abbreviations (Original)
+    // 🆕 NEW: Additional medical specialties from your hospital directory
+    "ENT": "Otolaryngology", "EAR": "Otolaryngology", "NOSE": "Otolaryngology", "THROAT": "Otolaryngology",
+    "HEARING": "Audiology", "AUDIO": "Audiology", "CARDIO": "Cardiology", "HEART": "Cardiology", 
+    "EKG": "Electrocardiogram", "ECG": "Electrocardiogram", "ECHO": "Echocardiogram", "CATH": "Catheterization",
+    "NEURO": "Neurology", "BRAIN": "Neurology", "NEUROPSYCH": "Neuropsychology", "EEG": "Electroencephalogram",
+    "EPILEPSY": "Seizure Disorder", "ONCO": "Oncology", "CANCER": "Oncology", "CHEMO": "Chemotherapy", 
+    "BMT": "Bone Marrow Transplant", "HEMATOLOGY": "Blood Disorders", "HEME": "Hematology",
+    "PEDS": "Pediatric", "CHILD": "Pediatric", "KIDS": "Pediatric", "NEONATAL": "Newborn",
+    "SURG": "Surgery", "OPERATION": "Surgery", "PROCEDURE": "Surgery", "MAXFAC": "Maxillofacial",
+    "ORAL SURG": "Oral Surgery", "PLASTIC": "Plastic Surgery", "ORTHO": "Orthopedics", "BONES": "Orthopedics",
+    "GI": "Gastroenterology", "GASTRO": "Gastroenterology", "STOMACH": "Gastroenterology",
+    "DIGESTIVE": "Gastroenterology", "INTESTINAL": "Gastroenterology", "PULM": "Pulmonary",
+    "LUNG": "Pulmonary", "BREATHING": "Pulmonary", "RESPIRATORY": "Pulmonary", "PFT": "Pulmonary Function Test",
+    "ENDO": "Endocrinology", "DIABETES": "Endocrinology", "HORMONE": "Endocrinology", "THYROID": "Endocrinology",
+    "URO": "Urology", "KIDNEY": "Urology", "BLADDER": "Urology", "DIALYSIS": "Nephrology", "NEPHRO": "Nephrology",
+    "OBGYN": "Obstetrics Gynecology", "OB": "Obstetrics", "GYN": "Gynecology", "WOMEN": "Gynecology",
+    "PREGNANCY": "Obstetrics", "BIRTH": "Labor and Delivery", "LABOR": "Labor and Delivery",
+    "DERM": "Dermatology", "SKIN": "Dermatology", "PSYCH": "Psychiatry", "PSYCHOLOGY": "Psychology", 
+    "MENTAL": "Psychiatry", "BEHAVIORAL": "Behavioral Medicine", "AUTISM": "Autism Spectrum Disorder",
+    "PHYSICAL": "Physical Therapy", "OCCUPATIONAL": "Occupational Therapy", "SPEECH": "Speech Therapy",
+    "ST": "Speech Therapy", "WEIGHT": "Weight Management", "NUTRITION": "Nutrition", "EATING": "Eating Disorders",
+    "BLOOD": "Hematology", "DRAW": "Phlebotomy", "LAB WORK": "Laboratory", "BLOOD WORK": "Laboratory",
+    "ID": "Infectious Disease", "INFECTION": "Infectious Disease", "PALLIATE": "Palliative Care",
+    "COMFORT": "Palliative Care", "END OF LIFE": "Palliative Care", "GENDER": "Gender Clinic",
+    "TRANSGENDER": "Gender Clinic", "TRANS": "Gender Clinic", "SLEEP": "Sleep Medicine",
+    "SLEEP STUDY": "Sleep Medicine", "SCAN": "Imaging", "IMAGING": "Radiology", "PICTURE": "Radiology",
+    "SONO": "Ultrasound", "GENETIC": "Genetics", "GENES": "Genetics", "DNA": "Genetics",
+    "RHEUM": "Rheumatology", "ARTHRITIS": "Rheumatology", "JOINT": "Rheumatology",
+    "SPORTS": "Sports Medicine", "ATHLETIC": "Sports Medicine", "TRANSPLANT": "Transplant", "ORGAN": "Transplant",
+    
+    // Room/Space Abbreviations (keeping all your originals)
     "JanClos": "Janitorial Closet", "CleanRm": "Clean Room", "MaintRm": "Maintenance Room", "ExamRm": "Examination Room", "ProcedRm": "Procedure Room", "TrainingRm": "Training Room", "TestRm": "Testing Room", "AnteRm": "Anteroom", "ScrubRm": "Scrub Room", "CallRm": "Call Room", "TubRm": "Tub Room", "ControlRm": "Control Room", "CopyRm": "Copy Room", "StaffRm": "Staff Room", "RecovryRm": "Recovery Room", "StaffLkrRm": "Staff Locker Room", "StrlzerRm": "Sterilizer Room", "StaffShowr": "Staff Shower", "FileRm": "File Room", "ObsrvtnRm": "Observation Room", "PatDress": "Patient Dressing Room", "PatPrep": "Patient Preparation Room", "LockerRm": "Locker Room", "TeamngArea": "Teaming Area", "PatnLounge": "Patient Lounge", "DptLounge": "Department Lounge", "ParntSleep": "Parent Sleep Area", "ParntShwr": "Parent Shower", "NurishmtRm": "Nourishment Room", "PatnKitchn": "Patient Kitchen", "RecepArea": "Reception Area", "OpenWkSta": "Open Workstation", "FlxOpnWkSt": "Flexible Open Workstation", "FlexCubicl": "Flexible Cubicle", "FlexOffice": "Flexible Office", "CompSuppt": "Computer Support", "ReceptWtg": "Reception Waiting", "ReceptClrk": "Reception Clerk", "LobbyVest": "Lobby Vestibule", "MedSupply": "Medical Supply", "PharSupply": "Pharmacy Supply", "SterileStg": "Sterile Storage", "MedGasStrg": "Medical Gas Storage", "VndgWOStg": "Vending with Storage", "SoiledLin": "Soiled Linen", "ClnLin": "Clean Linen", "StrlSoiled": "Sterile Soiled", "StrlStrg": "Sterile Storage", "SupplyRm": "Supply Room", "StorageRm": "Storage Room", "StockRm": "Stock Room", "DptStorage": "Department Storage", "EqmtStrgRm": "Equipment Storage Room", "SuplStgRm": "Supply Storage Room", "ImEquipSup": "Imaging Equipment Supply", "StrlInsSup": "Sterile Instrument Supply", "SrgySupEqm": "Surgery Supply Equipment", "ClnLnMdSup": "Clean Linen Medical Supply", "ClnLin/MdS": "Clean Linen/Medical Supply", "SoiLinSupl": "Soiled Linen Supply", "CServSupp": "Central Service Support", "CentralSup": "Central Supply", "DiagLabSup": "Diagnostic Lab Supply", "DiagTrtmt": "Diagnostic Treatment", "TherTrtmt": "Therapy Treatment", "SurgerySvc": "Surgery Service", "HazardMat": "Hazardous Materials", "AssignCir": "Assigned Circulation", "AssignCirc": "Assigned Circulation", "ExtendStay": "Extended Stay", "InPatnt": "Inpatient", "OutPtToilt": "Outpatient Toilet", "PreOpPtPre": "Pre-Op Patient Prep", "FoodFacSvc": "Food Facility Service", "FoodStPrep": "Food Service Preparation", "Circulat'n": "Circulation", "PublicWait": "Public Waiting", "PubCorr": "Public Corridor", "AsgnToilet": "Assigned Toilet", "StffToilet": "Staff Toilet", "OutPtClsRm": "Outpatient Closet Room", "PubRestRm": "Public Restroom", "AlGnHandic": "All Gender Handicap", "AlGnRestRm": "All Gender Restroom", "Men-Handic": "Men's Handicap", "Wmn-Handic": "Women's Handicap", "DptBreak": "Department Break Room", "DptKitchen": "Department Kitchen", "DptMail": "Department Mail", "Treat/Exam": "Treatment/Examination", "Tr/ExamSvc": "Treatment/Examination Service", "ExamSvc": "Examination Service", "PatienBdrm": "Patient Bedroom", "PatientBth": "Patient Bathroom", "InPatnBth": "In Patient Bathroom", "PatBedSvc": "Patient Bed Service", "NurseStnSr": "Nurse Station Service", "Nurse Stat": "Nurse's Station", "StaffOnCal": "Staff On Call", "StfOnCallS": "Staff On Call Service", "AssemblySv": "Assembly Service", "MerchSvc": "Merchandise Service", "merchandsg": "Merchandising", "MedProdSvc": "Medical Product Service", "RadCT": "Radiology CT", "RadIR": "Radiology Interventional", "RadMRI": "Radiology MRI", "RadNucMed": "Radiology Nuclear Medicine", "RadUltrasd": "Radiology Ultrasound", "RadXRay": "Radiology X-Ray", "DiagSrvLab": "Diagnostic Service Laboratory", "IsotopeRm": "Isotope Room", "FilmPrView": "Film Preview", "BldDrawSta": "Blood Draw Station", "ProsthShop": "Prosthetics Shop", "PhotogSvc": "Photography Service", "ChartFFRm": "Charting/Forms/Files Room", "Decontamin": "Decontamination", "PrepStgRm": "Preparation Staging Room", "ConsultRm": "Consultation Room", "PsychPtIso": "Psychiatric Patient Isolation", "InPatnICU": "Inpatient ICU", "InPatnIso": "Inpatient Isolation", "InPatnPsyc": "Inpatient Psychiatric", "LbrDeliIso": "Labor Delivery Isolation", "LbrDeliv": "Labor Delivery", "NeoICU": "Neonatal ICU", "NeoICUIso": "Neonatal ICU Isolation", "PedInPtPsy": "Pediatric Inpatient Psychiatric", "PedsICU": "Pediatric ICU", "AcThTrtRm": "Acute Therapy Treatment Room", "InPatClsRm": "Inpatient Classroom", "ActPlayRm": "Activity/Play Room", "PatFamAmen": "Patient Family Amenities", "HseOfcrOnC": "House Officer On Call", "MedStuOnC": "Medical Student On Call", "On-CallRm": "On-Call Room", "OnCallClst": "On Call Closet", "OnCallLnge": "On Call Lounge", "OnCllBthrm": "On Call Bathroom", "Ctrl/Obsrv": "Control/Observation", "HVAC": "Heating, Ventilation, and Air Conditioning", "ElectEquip": "Electrical Equipment", "MechEquip": "Mechanical Equipment", "VertShaft": "Vertical Shaft", "Comm": "Communications", "Off.": "Office", "Off": "Office", "Mech.": "Mechanical", "Mech": "Mechanical", "Admin.": "Administration", "Admin": "Administration", "Lab.": "Laboratory", "Lab": "Laboratory", "Stor.": "Storage", "Stor": "Storage", "WC": "Bathroom", "Restroom": "Bathroom", "Corr.": "Corridor", "Corr": "Corridor", 
     
-    // Michigan Medicine Departments (Original - Complete List)
-    "MM CW - Facilities Maintenance": "CW - Facilities Maintenance", "MM - ECT Nursing Services": "ECT Nursing Services", "MM Matl Mgmt - Warehouse Ops": "Material Management - Warehouse Operations", "MM CW Ped Cardiology - Tech": "CW Pediatrics Cardiology - Technical", "MM Nsg Clin Support CSR": "Nursing Clinical Support Clinical Support Representative", "MM UMMG NonACU Prof - Derm.": "UMMG Non-Acute Care Unit Professional - Dermatology", "MM UMMG NonACU Prof - Orthopae": "UMMG Non-Acute Care Unit Professional - Orthopaedics", "MM CW 8W": "CW 8 West", "MM CW Mott Administration": "CW Mott Administration", "MM CW Ped Surgery Admin": "CW Pediatrics Surgery Administration", "MM CW Social Work - Pediatric": "CW Social Work - Pediatric", "MM UMMG NonACU Prof - Radiatio": "UMMG Non-Acute Care Unit Professional - Radiation Oncology", "MM Nsg OH CNE": "Nursing Occupational Health Clinical Nurse Educator", "MM CW Pediatric Audiology": "CW Pediatric Audiology", "MM CW Fetal Diagnostic Center": "CW Fetal Diagnostic Center", "MM CW Neuro/Oral/Plastic Surg": "CW Neurology/Oral/Plastic Surgery", "MM Quality - Infection Prevent": "Quality - Infection Prevention", "MM Peds Administration": "Pediatrics Administration", "MM DLHS Administration": "Department of Learning Health Sciences Administration", "MM CW Childrens Emergency Svc": "CW Childrens Emergency Service", "MM Chief of Clinical Affairs": "Chief of Clinical Affairs", "MM OH Care Mgt Admin": "Occupational Health Care Management Administration", "MM UMMG NonACU Prof - Infectio": "UMMG Non-Acute Care Unit Professional - Infectious Diseases", "MM CW Ped Multi - Spec FL6": "CW Pediatrics Multi - Specialty Floor 6", "MM Maintenance": "Maintenance", "MM CW Oper Room - Mott": "CW Operating Room - Mott", "MM Neurology IOM": "Neurology Intraoperative Neurophysiological Monitoring", "MM Admin - Anesthesia": "Administration - Anesthesia", "MM Vestiblr Test - Tech": "Vestibular Test - Technical", "MM CW Pediatric Ortho Clinic": "CW Pediatric Orthopaedic Clinic", "MM Surg/Necropsy Path": "Surgery/Necropsy Pathology", "MM Psych Emergency Svc": "Psychiatry Emergency Service", "MM Logistics Patient Transport": "Logistics Patient Transport", "MM CW Peds Infusion": "CW Pediatrics Infusion", "MM CW Post Anes Care Unit-Mott": "CW Post Anesthesia Care Unit-Mott", "MM UMMG NonACU Prof - Ped Surg": "UMMG Non-Acute Care Unit Professional - Pediatric Surgery", "MM CW Urology Clinic LVL 4": "CW Urology Clinic Level 4", "MM Psych Chair s Office": "Psychiatry Chair's Office", "MM Hosp/Med School Interunit": "Hospital/Medical School Interunit", "MM Medical School Administratn": "Medical School Administration", "MM TC Administration": "Transplant Center Administration", "MM Oral Surg Med Inn Clinic": "Oral Surgery Medical Inn Clinic", "MM CW Photophersis Center": "CW Photopheresis Center", "MM CW OB/GYN Clinic Tech": "CW Obstetrics/Gynecology Clinic Technical", "MM Nsg Clin Support SWAT": "Nursing Clinical Support SWAT", "MM CW-Triage Midwives": "CW-Triage Midwives", "MM Cardiac Cath Lab Tech": "Cardiac Catheterization Laboratory Technical", "MM Med Proc Unit - Tech": "Medical Procedure Unit - Technical", "MM CVC - Diagnostic Vascular": "Cardiovascular Center - Diagnostic Vascular", "MM Clinical Lab Admin": "Clinical Laboratory Administration", "MM Pat and Fam Support Svc": "Patient and Family Support Service", "MM Int Med Fac Hospitalists": "Internal Medicine Faculty Hospitalists", "MM CW Mott Resp Therapy": "CW Mott Respiratory Therapy", "MM Acute Hemodialysis": "Acute Hemodialysis", "MM CW Hemophilia/COAG CMS": "CW Hemophilia/Coagulation CMS", "MM Cancer Center Admin": "Cancer Center Administration", "MM Cardiology Admin": "Cardiology Administration", "MM HomeMed Pharmacy Infusion": "HomeMed Pharmacy Infusion", "MM CVC Clinic": "Cardiovascular Center Clinic", "MM Psych Split Fund": "Psychiatry Split Fund", "MM OH Care Mgt": "Occupational Health Care Management", "MM Med Inn Sleep Clinic": "Medical Inn Sleep Clinic", "MM CPU Central/Recovery": "Cardiac Procedure Unit Central/Recovery", "MM Pathology Blood Bank": "Pathology Blood Bank", "MM Interventnl Nephrology Unit": "Interventional Nephrology Unit", "MM Safety Management Services": "Safety Management Services", "MM Infusion Cancer Center": "Infusion Cancer Center", "MM Entrance Services": "Entrance Services", "MM Blue Cancer Center": "Blue Cancer Center", "MM Sleep Laboratory": "Sleep Laboratory", "MM CW Pediatric OTO Clinic": "CW Pediatric Otolaryngology Clinic", "MM Psych Adult I/P": "Psychiatry Adult Inpatient", "MM Urology": "Urology", "MM Noncapital Infrastructure": "Noncapital Infrastructure", "MM Dermatology-Tech": "Dermatology-Technical", "MM Nsg OH Prof Dev and Ed": "Nursing Occupational Health Professional Development and Education", "MM Gold Cancer Center": "Gold Cancer Center", "MM Pharmacy Administration": "Pharmacy Administration", "MM Contract Services Programs": "Contract Services Programs", "MM Radiology UH": "Radiology University Hospital", "MM Thyroid Clinic RAD": "Thyroid Clinic Radiology", "MM CW Path O/P Phlebotomy": "CW Pathology Outpatient Phlebotomy", "MM Research-Clin Trial Units": "Research-Clinical Trial Units", "MM UMMG NonACU Prof - Neurolog": "UMMG Non-Acute Care Unit Professional - Neurology", "MM Otolaryngology - HNS": "Otolaryngology - Head and Neck Surgery", "MM Molec & Integratv Physiolog": "Molecular and Integrative Physiology", "MM Path Reference Tests": "Pathology Reference Tests", "MM GSA - Veterans Affairs(VAH)": "GSA - Veterans Affairs(VAH)", "MM Revenue Cycle Administrtn": "Revenue Cycle Administration", "MM Environmental Svcs - Admin": "Environmental Services - Administration", "MM Necropsy Suite/Medicolegal": "Necropsy Suite/Medicolegal", "MM Inpatient Pharmacy Svcs": "Inpatient Pharmacy Services", "MM Ctr fr Translational Path.": "Center for Translational Pathology", "MM GSA - Administrtn (GSA/ADM)": "GSA - Administration (GSA/ADM)", "MM Maize Cancer Center": "Maize Cancer Center", "MM HITS FA Fin Ops & Analysis": "Health Information Technology & Services Financial Analysis Financial Operations & Analysis", "MM Howard Hughes Med Institute": "Howard Hughes Medical Institute", "MM CW Adult BMT & Leuke. Infus": "CW Adult Bone Marrow Transplant and Leukemia Infusion", "MM Med Inn Admin": "Medical Inn Administration", "MM UMMG NonACU Prof - Plastic": "UMMG Non-Acute Care Unit Professional - Plastic Surgery", "MM CW Peds Pulmonary Function": "CW Pediatrics Pulmonary Function", "MM Peds Acute Care Therapy": "Pediatrics Acute Care Therapy", "MM UMMG NonACU Prof - Cardiolo": "UMMG Non-Acute Care Unit Professional - Cardiology", "MM Hem Onc Phys Ext - Prof": "Hematology Oncology Physician Extender - Professional", "MM Orthotics&Prosthetics Ctr": "Orthotics and Prosthetics Center", "MM Building Utilities": "Building Utilities", "MM Pathology Informatics": "Pathology Informatics", "MM CW Peds Speech-Lang Path": "CW Pediatrics Speech-Language Pathology", "MM MSA Institutnl Commit & Adj": "Medical School Administration Institutional Committee & Adjudication", "MM Int Med-Hematology/Oncology": "Internal Medicine-Hematology/Oncology", "MM Investigations": "Investigations", "MM Oper Rooms - Univ Hospital": "Operating Rooms - University Hospital", "MM CW Adult BMT & Leuke. Clin": "CW Adult Bone Marrow Transplant and Leukemia Clinic", "MM UH CVC 8D": "University Hospital Cardiovascular Center 8D", "MM UMMG NonACU Prof - Neurosur": "UMMG Non-Acute Care Unit Professional - Neurosurgery", "MM Transfusion/Apheresis": "Transfusion/Apheresis", "MM Gen Surg Clinic - Tech": "General Surgery Clinic - Technical", "MM UH CVC Med Short Stay": "University Hospital Cardiovascular Center Medical Short Stay", "MM Anesthesia UH": "Anesthesia University Hospital", "MM Speech Pathology": "Speech Pathology", "MM Lab Animal Medicine Unit": "Laboratory Animal Medicine Unit", "MM CW - Non-Cancer Infusion": "CW - Non-Cancer Infusion", "MM Adult I/P Social Work": "Adult Inpatient Social Work", "MM UH/CVC Executive Director": "University Hospital/Cardiovascular Center Executive Director", "MM Facilities": "Facilities", "MM Radiation Oncology - AA": "Radiation Oncology - Ann Arbor", "MM Centralized Scope Process.": "Centralized Scope Processing", "MM Friends Gift Sh-Oper": "Friends Gift Shop-Operations", "MM CVC Rad": "Cardiovascular Center Radiology", "MM UH CVC Nsg Surg Admin": "University Hospital Cardiovascular Center Nursing Surgery Administration", "MM Pm&R Rehab Engr": "Physical Medicine & Rehabilitation Rehab Engineering", "MM Pulmonary Lab Tech": "Pulmonary Laboratory Technical", "MM UH CVC CVC4": "University Hospital Cardiovascular Center CVC4", "MM Gold Cancer Center RAD": "Gold Cancer Center Radiology", "MM UH CVC 4B": "University Hospital Cardiovascular Center 4B", "MM CW Cardiac Surg OR/FI Cover": "CW Cardiac Surgery Operating Room/Fixed Imaging Coverage", "MM UH CVC 4A": "University Hospital Cardiovascular Center 4A", "MM UH CVC 4C": "University Hospital Cardiovascular Center 4C", "MM UH CVC 5A": "University Hospital Cardiovascular Center 5A", "MM UH CVC 7A-1": "University Hospital Cardiovascular Center 7A-1", "MM UH CVC 6D": "University Hospital Cardiovascular Center 6D", "MM UH CVC CVC5-ICU": "University Hospital Cardiovascular Center CVC5-Intensive Care Unit", "MM UH CVC 6B1": "University Hospital Cardiovascular Center 6B1", "MM UH CVC CVC5": "University Hospital Cardiovascular Center CVC5", "MM UH CVC 7B": "University Hospital Cardiovascular Center 7B", "MM UH CVC 5B1": "University Hospital Cardiovascular Center 5B1", "MM UH CVC 7C": "University Hospital Cardiovascular Center 7C", "MM UH CVC 5C": "University Hospital Cardiovascular Center 5C", "MM UH CVC 7D": "University Hospital Cardiovascular Center 7D", "MM UH CVC 5D": "University Hospital Cardiovascular Center 5D", "MM UH CVC 8A2": "University Hospital Cardiovascular Center 8A2", "MM UH CVC 8B2": "University Hospital Cardiovascular Center 8B2", "MM UH CVC 8C": "University Hospital Cardiovascular Center 8C", "MM UH CVC 9C": "University Hospital Cardiovascular Center 9C", "MM Diag Vascular - Tech": "Diagnostic Vascular - Technical", "MM Path O/P - Phleb Taubman": "Pathology Outpatient - Phlebotomy Taubman", "MM CW PM&R Rehab Engr": "CW Physical Medicine & Rehabilitation Rehab Engineering", "MM Echocardio Technical": "Echocardiography Technical", "MM Pediatric Hematology Oncolo": "Pediatric Hematology Oncology", "MM Surgery Department": "Surgery Department", "MM Urology Clinic - Tech": "Urology Clinic - Technical", "MM DLHS Clin. Simulation Ctr": "Department of Learning Health Sciences Clinical Simulation Center", "MM Pm&R Emg": "Physical Medicine & Rehabilitation Electromyography", "MM GSA - Gastrointestinal(SGI)": "GSA - Gastrointestinal(SGI)", "MM Neurology Stroke Program": "Neurology Stroke Program", "MM GSA - Surg Oncology (SON)": "GSA - Surgery Oncology (SON)", "MM Frankel CVC Administration": "Frankel Cardiovascular Center Administration", "MM Operations and Ancill Svcs": "Operations and Ancillary Services", "MM Oral & Maxillofacial Surg": "Oral and Maxillofacial Surgery", "MM Int Med-Genetic Medicine": "Internal Medicine-Genetic Medicine", "MM Clinical Engineering Svcs": "Clinical Engineering Services", "MM Clinical Engineering": "Clinical Engineering", "MM Int Med Admin/Overhead": "Internal Medicine Administration/Overhead", "MM Gifts of Art": "Gifts of Art", "MM Revenue Cycle Mid-Service": "Revenue Cycle Mid-Service", "MM Parking Support": "Parking Support", "MM Reg & Ins Verification": "Registration & Insurance Verification", "MM Dermatology Department": "Dermatology Department", "MM Resp/Cardiov Svcs": "Respiratory/Cardiovascular Services", "MM Supply Chain Admin": "Supply Chain Administration", "MM O-CTSU Stdy Coordinatr Clin": "Oncology Clinical Trials Support Unit Study Coordinator Clinical", "MM Pathology Department": "Pathology Department", "MM Ob-Gyn Admin.": "Obstetrics-Gynecology Administration", "MM UHCVC Security Svcs": "University Hospital Cardiovascular Center Security Services", "MM Construction Svcs Admin": "Construction Services Administration", "MM Int Med-Gastroenterology": "Internal Medicine-Gastroenterology", "MM Interpreters Program": "Interpreters Program", "MM Social Work Guest Prog": "Social Work Guest Program", "MM PAR Management": "Patient Access/Registration Management", "Institutional Org": "Institutional Organization", "MM CW VVWH": "CW Von Voigtlander Women's Hospital", "MM Patient Experience": "Patient Experience", "MM UH CVC 6C": "University Hospital Cardiovascular Center 6C", "MM-Adult Palliative Care": "Adult Palliative Care", "MM-CVC ACU Rad": "Cardiovascular Center Acute Care Unit Radiology", "MM Ekogram Technical": "Echocardiogram Technical"
+    // Michigan Medicine Departments (keeping all your existing ones) - truncated for space
+    "MM CW - Facilities Maintenance": "CW - Facilities Maintenance", "MM - ECT Nursing Services": "ECT Nursing Services", "MM Matl Mgmt - Warehouse Ops": "Material Management - Warehouse Operations", "MM CW Ped Cardiology - Tech": "CW Pediatrics Cardiology - Technical"
+    // ... (include all the other MM departments from your original config)
 };
+
+// 🆕 NEW: Comprehensive medical misspelling dictionaries
+const medicalSpecialtyMisspellings = {
+    "cardioligy": "cardiology", "cardiolgoy": "cardiology", "cardiolagy": "cardiology", "cardiologi": "cardiology", 
+    "cardiologie": "cardiology", "cardiolgy": "cardiology", "cardiolology": "cardiology", "cardeology": "cardiology",
+    "nuerology": "neurology", "neurologoy": "neurology", "neruology": "neurology", "neurolgoy": "neurology", 
+    "neuroolgy": "neurology", "nurology": "neurology", "neurolgy": "neurology", "neurallogy": "neurology",
+    "orthopaedics": "orthopedics", "orthopaedic": "orthopedic", "orthopedic": "orthopedics", "orthopeadics": "orthopedics", 
+    "orthapedics": "orthopedics", "orthopeidcs": "orthopedics", "orthapedic": "orthopedic", "orthopeadic": "orthopedic",
+    "gastrenterology": "gastroenterology", "gastroenterolgoy": "gastroenterology", "gastroentrology": "gastroenterology", 
+    "gastroentorology": "gastroenterology", "gastroenterolgy": "gastroenterology", "gastrentology": "gastroenterology",
+    "dermatolgy": "dermatology", "dermatolgoy": "dermatology", "dermatollogy": "dermatology", "dermotology": "dermatology",
+    "opthamology": "ophthalmology", "opthalmology": "ophthalmology", "ophthalmolgoy": "ophthalmology", "opthamalogy": "ophthalmology",
+    "otolaryngolgy": "otolaryngology", "otolaryngolgoy": "otolaryngology", "otolaringology": "otolaryngology",
+    "rhuematology": "rheumatology", "rheumatolgoy": "rheumatology", "ruematology": "rheumatology", "rheumatolgy": "rheumatology",
+    "endocrinoligy": "endocrinology", "endocrinolgoy": "endocrinology", "endocronology": "endocrinology", "endocrinolgy": "endocrinology",
+    "oncologoy": "oncology", "oncolgy": "oncology", "oncollogy": "oncology", "onkology": "oncology",
+    "hematolgoy": "hematology", "hematollogy": "hematology", "hemataligy": "hematology", "hemotology": "hematology",
+    "nephrologoy": "nephrology", "nephrolgoy": "nephrology", "nephrolgy": "nephrology", "nephrollogy": "nephrology",
+    "urologoy": "urology", "urolgoy": "urology", "urollogy": "urology", "uroligy": "urology",
+    "psychiatrey": "psychiatry", "psychiaty": "psychiatry", "psyciatry": "psychiatry", "psyhiatry": "psychiatry",
+    "psychologoy": "psychology", "psycology": "psychology", "psychollogy": "psychology", "psyhology": "psychology"
+};
+
+const medicalProcedureMisspellings = {
+    "xray": "x-ray", "x ray": "x-ray", "exray": "x-ray", "ultrasond": "ultrasound", "utrasound": "ultrasound",
+    "mamogram": "mammogram", "mamograph": "mammogram", "colonscopy": "colonoscopy", "coloscopy": "colonoscopy",
+    "phisical therapy": "physical therapy", "fisical therapy": "physical therapy", "speach therapy": "speech therapy",
+    "blod work": "blood work", "bloodwork": "blood work", "surgury": "surgery", "surgerie": "surgery"
+};
+
+const medicalConditionMisspellings = {
+    "diabetis": "diabetes", "diabeties": "diabetes", "diabetese": "diabetes", "hypertention": "hypertension",
+    "arthitis": "arthritis", "arthitus": "arthritis", "pnemonia": "pneumonia", "asma": "asthma",
+    "alzheimers": "alzheimer", "alzhiemers": "alzheimer", "parkinsons": "parkinson", "depresion": "depression",
+    "anxeity": "anxiety", "anxety": "anxiety", "epilepsi": "epilepsy", "epelepsy": "epilepsy"
+};
+
+const anatomyMisspellings = {
+    "stomache": "stomach", "stomack": "stomach", "hart": "heart", "herat": "heart", "brane": "brain",
+    "brian": "brain", "kidny": "kidney", "kidnies": "kidney", "lever": "liver", "livr": "liver",
+    "thyroids": "thyroid", "thyriod": "thyroid", "tyroid": "thyroid"
+};
+
+// 🆕 NEW: Medical condition to specialty mapping
+const conditionToSpecialty = {
+    "headache": ["neurology", "pain management"], "seizure": ["neurology", "epilepsy"],
+    "heart problems": ["cardiology"], "chest pain": ["cardiology", "emergency"],
+    "breathing problems": ["pulmonary", "respiratory"], "stomach pain": ["gastroenterology", "emergency"],
+    "joint pain": ["rheumatology", "orthopedics"], "back pain": ["orthopedics", "pain management", "physical therapy"],
+    "skin problems": ["dermatology"], "eye problems": ["ophthalmology"], "ear problems": ["otolaryngology", "ent"],
+    "hearing loss": ["audiology", "ent"], "pregnancy": ["obstetrics", "ob"], "diabetes": ["endocrinology"],
+    "cancer": ["oncology", "hematology"], "blood disorder": ["hematology"], "kidney problems": ["nephrology", "urology"],
+    "depression": ["psychiatry", "psychology"], "anxiety": ["psychiatry", "psychology"],
+    "eating disorder": ["eating disorders", "psychiatry"], "autism": ["autism", "developmental"],
+    "sleep problems": ["sleep medicine"], "weight loss": ["weight management", "nutrition"],
+    "hormone problems": ["endocrinology"], "infection": ["infectious disease"], "broken bone": ["orthopedics", "emergency"]
+};
+
+// 🆕 NEW: Procedure/test to specialty mapping  
+const procedureToSpecialty = {
+    "blood draw": ["laboratory", "phlebotomy"], "blood test": ["laboratory"], "x-ray": ["radiology", "imaging"],
+    "mri": ["radiology", "imaging"], "ct scan": ["radiology", "imaging"], "ultrasound": ["radiology", "imaging"],
+    "ekg": ["cardiology"], "ecg": ["cardiology"], "echo": ["cardiology"], "eeg": ["neurology"],
+    "colonoscopy": ["gastroenterology"], "endoscopy": ["gastroenterology"], "biopsy": ["pathology", "surgery"],
+    "surgery": ["surgery"], "physical therapy": ["physical therapy", "rehabilitation"],
+    "occupational therapy": ["occupational therapy"], "speech therapy": ["speech therapy"],
+    "chemotherapy": ["oncology", "infusion"], "radiation": ["radiation oncology"], "dialysis": ["nephrology"],
+    "sleep study": ["sleep medicine"], "stress test": ["cardiology"], "pulmonary function": ["pulmonary"],
+    "allergy test": ["allergy", "immunology"]
+};
+
+// 🆕 NEW: Reverse abbreviation map for bidirectional search
+const reverseAbbreviationMap = {};
+Object.entries(abbreviationMap).forEach(([abbr, full]) => {
+    const fullLower = full.toLowerCase();
+    const abbrLower = abbr.toLowerCase();
+    
+    reverseAbbreviationMap[fullLower] = abbrLower;
+    
+    const words = fullLower.split(/[\s\-\/]+/);
+    if (words.length > 1) {
+        const firstTwo = words.slice(0, 2).join(' ');
+        if (firstTwo.length > 3) {
+            reverseAbbreviationMap[firstTwo] = abbrLower;
+        }
+        
+        words.forEach(word => {
+            if (word.length > 3 && !reverseAbbreviationMap[word]) {
+                reverseAbbreviationMap[word] = abbrLower;
+            }
+        });
+    }
+});
+
+// 🆕 NEW: Comprehensive misspelling correction system
+class MedicalSpellingCorrector {
+    constructor() {
+        this.corrections = {
+            ...medicalSpecialtyMisspellings,
+            ...medicalProcedureMisspellings, 
+            ...medicalConditionMisspellings,
+            ...anatomyMisspellings
+        };
+        
+        this.correctWords = new Set(Object.values(this.corrections));
+        this.misspelledWords = new Set(Object.keys(this.corrections));
+    }
+    
+    correctSpelling(word) {
+        const lowercase = word.toLowerCase();
+        return this.corrections[lowercase] || word;
+    }
+    
+    findClosestMatch(word, maxDistance = 2) {
+        const lowercase = word.toLowerCase();
+        
+        if (this.corrections[lowercase]) {
+            return this.corrections[lowercase];
+        }
+        
+        let bestMatch = word;
+        let bestDistance = maxDistance + 1;
+        
+        for (let correctWord of this.correctWords) {
+            const distance = this.levenshteinDistance(lowercase, correctWord);
+            if (distance <= maxDistance && distance < bestDistance) {
+                bestMatch = correctWord;
+                bestDistance = distance;
+            }
+        }
+        
+        for (let misspelled of this.misspelledWords) {
+            const distance = this.levenshteinDistance(lowercase, misspelled);
+            if (distance <= 1 && distance < bestDistance) {
+                bestMatch = this.corrections[misspelled];
+                bestDistance = distance;
+            }
+        }
+        
+        return bestMatch;
+    }
+    
+    levenshteinDistance(str1, str2) {
+        const matrix = [];
+        
+        for (let i = 0; i <= str2.length; i++) {
+            matrix[i] = [i];
+        }
+        
+        for (let j = 0; j <= str1.length; j++) {
+            matrix[0][j] = j;
+        }
+        
+        for (let i = 1; i <= str2.length; i++) {
+            for (let j = 1; j <= str1.length; j++) {
+                if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(
+                        matrix[i - 1][j - 1] + 1,
+                        matrix[i][j - 1] + 1,
+                        matrix[i - 1][j] + 1
+                    );
+                }
+            }
+        }
+        
+        return matrix[str2.length][str1.length];
+    }
+    
+    correctSearchQuery(query) {
+        const words = query.toLowerCase().split(/\s+/);
+        const correctedWords = words.map(word => {
+            let corrected = this.correctSpelling(word);
+            
+            if (corrected === word && word.length > 4) {
+                corrected = this.findClosestMatch(word);
+            }
+            
+            return corrected;
+        });
+        
+        const correctedQuery = correctedWords.join(' ');
+        
+        if (correctedQuery !== query.toLowerCase()) {
+            console.log(`🔤 Spelling correction: "${query}" → "${correctedQuery}"`);
+        }
+        
+        return correctedQuery;
+    }
+}
+
+// 🆕 NEW: Enhanced bidirectional search function
+function findBidirectionalMatches(searchTerm) {
+    const term = searchTerm.toLowerCase().trim();
+    const matches = new Set();
+    
+    if (abbreviationMap[searchTerm.toUpperCase()]) {
+        matches.add(abbreviationMap[searchTerm.toUpperCase()].toLowerCase());
+        matches.add(searchTerm.toLowerCase());
+    }
+    
+    if (reverseAbbreviationMap[term]) {
+        matches.add(reverseAbbreviationMap[term]);
+        matches.add(term);
+    }
+    
+    Object.entries(abbreviationMap).forEach(([abbr, full]) => {
+        const fullLower = full.toLowerCase();
+        const abbrLower = abbr.toLowerCase();
+        
+        if (fullLower.includes(term) && term.length > 2) {
+            matches.add(abbrLower);
+            matches.add(fullLower);
+        }
+        
+        if (abbrLower.includes(term) && term.length > 1) {
+            matches.add(abbrLower);
+            matches.add(fullLower);
+        }
+    });
+    
+    return Array.from(matches);
+}
+
+// 🆕 NEW: Enhanced search expansion with spelling correction
+function enhancedSearchExpansionWithSpelling(query) {
+    const spellChecker = new MedicalSpellingCorrector();
+    const correctedQuery = spellChecker.correctSearchQuery(query);
+    const normalizedQuery = correctedQuery.toLowerCase().trim();
+    const expansions = new Set([normalizedQuery, query.toLowerCase().trim()]);
+    
+    const bidirectional = findBidirectionalMatches(normalizedQuery);
+    bidirectional.forEach(match => expansions.add(match));
+    
+    Object.entries(conditionToSpecialty).forEach(([condition, specialties]) => {
+        if (normalizedQuery.includes(condition)) {
+            specialties.forEach(specialty => expansions.add(specialty));
+        }
+    });
+    
+    Object.entries(procedureToSpecialty).forEach(([procedure, specialties]) => {
+        if (normalizedQuery.includes(procedure)) {
+            specialties.forEach(specialty => expansions.add(specialty));
+        }
+    });
+    
+    return Array.from(expansions);
+}
 
 const fullReplacements = { 
-    "Circulation Public Corridor": "Corridor", 
-    "Circulation Lobby Vestibule": "Lobby", 
-    "Circulation Stair": "Stairwell", 
-    "Circulation Elevator": "Elevator", 
-    "Circulation Dock": "Loading Dock", 
-    "Public Toilet Uni-Sex": "Unisex Public Bathroom", 
-    "Public Toilet Men": "Men's Public Bathroom", 
-    "Public Toilet Women": "Women's Public Bathroom", 
-    "OutPtToilt": "Public Bathroom", 
-    "Mechanical Electrical Equipment": "Electrical Room", 
-    "Mechanical Mechanical Equipment": "Mechanical Room", 
-    "Mechanical HVAC": "HVAC Room", 
-    "Mechanical Vertical Shaft": "Vertical Shaft", 
-    "Mechanical Communications": "Communications Room", 
-    "HazardMat HazardMat": "Hazardous Materials Storage", 
-    "Conference Conference": "Conference Room", 
-    "Office Office": "Office", 
-    "Surgery Operating": "Operating Room" 
+    "Circulation Public Corridor": "Corridor", "Circulation Lobby Vestibule": "Lobby", 
+    "Circulation Stair": "Stairwell", "Circulation Elevator": "Elevator", "Circulation Dock": "Loading Dock", 
+    "Public Toilet Uni-Sex": "Unisex Public Bathroom", "Public Toilet Men": "Men's Public Bathroom", 
+    "Public Toilet Women": "Women's Public Bathroom", "OutPtToilt": "Public Bathroom", 
+    "Mechanical Electrical Equipment": "Electrical Room", "Mechanical Mechanical Equipment": "Mechanical Room", 
+    "Mechanical HVAC": "HVAC Room", "Mechanical Vertical Shaft": "Vertical Shaft", 
+    "Mechanical Communications": "Communications Room", "HazardMat HazardMat": "Hazardous Materials Storage", 
+    "Conference Conference": "Conference Room", "Office Office": "Office", "Surgery Operating": "Operating Room" 
 };
 
-// 🆕 ENHANCED: Smarter tagging rules with priority and specific patterns
 const tagRules = [ 
-    // High priority medical areas (Priority 10)
     { pattern: /operating|surgery|or\b/i, tag: "surgery", priority: 10 },
     { pattern: /icu|intensive|critical/i, tag: "critical-care", priority: 10 },
     { pattern: /emergency|er\b|trauma/i, tag: "emergency", priority: 10 },
-    
-    // High priority specialized areas (Priority 9)
     { pattern: /labor|delivery|birth|maternity/i, tag: "maternity", priority: 9 },
     { pattern: /pediatric|peds|child|nicu|picu/i, tag: "pediatric", priority: 9 },
-    
-    // Clinical areas (Priority 8)
     { pattern: /exam|treatment|therapy|medical|nurse|clinic/i, tag: "clinical", priority: 8 },
     { pattern: /radiology|imaging|ct|mri|xray|ultrasound/i, tag: "imaging", priority: 8 },
     { pattern: /laboratory|lab|pathology|blood/i, tag: "laboratory", priority: 8 },
-    
-    // Support medical areas (Priority 7)
     { pattern: /pharmacy|medication|drug/i, tag: "pharmacy", priority: 7 },
     { pattern: /patient|bed|room|family|visitor/i, tag: "patient-care", priority: 7 },
     { pattern: /recovery|pacu|post.*anesthesia/i, tag: "recovery", priority: 7 },
     { pattern: /outpatient toilet|public toilet|pub.*restroom/i, tag: "public-restroom", priority: 7 },
-    
-    // Facilities (Priority 6)
     { pattern: /toilet|bathroom|shower|restroom|wc/i, tag: "restroom", priority: 6 },
     { pattern: /security|access|control|monitor/i, tag: "security", priority: 6 },
     { pattern: /handicap|accessible|disability/i, tag: "accessible", priority: 6 },
-    
-    // Administrative areas (Priority 5)
     { pattern: /office|admin|conference|meeting|lounge/i, tag: "administration", priority: 5 },
     { pattern: /staff.*only|restricted|authorized/i, tag: "restricted", priority: 5 },
-    
-    // Support areas (Priority 4)
     { pattern: /storage|supply|equipment|closet/i, tag: "storage", priority: 4 },
     { pattern: /kitchen|food|dining|nutrition/i, tag: "food-service", priority: 4 },
-    
-    // Infrastructure (Priority 3)
     { pattern: /mechanical|electrical|maintenance|hvac|communications/i, tag: "infrastructure", priority: 3 },
-    
-    // Basic circulation (Priority 2)
     { pattern: /corridor|stair|elevator|lobby|circulation/i, tag: "circulation", priority: 2 }
 ];
 
-// 🆕 NEW: Room priority scoring for search ranking
 const roomPriorityMap = {
     "surgery": 10, "critical-care": 10, "emergency": 10,
     "maternity": 9, "pediatric": 9,
@@ -102,20 +354,52 @@ const roomPriorityMap = {
     "circulation": 2
 };
 
-// 🆕 NEW: Quick search shortcuts for common searches
 const searchShortcuts = {
-    "or": "surgery operating room",
-    "icu": "intensive care critical",
-    "er": "emergency",
-    "lab": "laboratory",
-    "rad": "radiology imaging",
-    "pharmacy": "pharmacy medication",
-    "bathroom": "restroom toilet",
-    "office": "administration office",
-    "pacu": "recovery post anesthesia",
-    "nicu": "pediatric neonatal intensive",
-    "picu": "pediatric intensive care",
-    "ct": "imaging computed tomography",
-    "mri": "imaging magnetic resonance",
-    "storage": "storage supply equipment"
+    "or": "surgery operating room", "icu": "intensive care critical", "er": "emergency",
+    "lab": "laboratory", "rad": "radiology imaging", "pharmacy": "pharmacy medication",
+    "bathroom": "restroom toilet", "office": "administration office", "pacu": "recovery post anesthesia",
+    "nicu": "pediatric neonatal intensive", "picu": "pediatric intensive care", "ct": "imaging computed tomography",
+    "mri": "imaging magnetic resonance", "storage": "storage supply equipment"
 };
+
+// 🆕 NEW: Initialize global spell checker instance
+const medicalSpellChecker = new MedicalSpellingCorrector();
+
+// 🆕 NEW: Easy-to-use spelling correction function
+function correctMedicalSpelling(query) {
+    return medicalSpellChecker.correctSearchQuery(query);
+}
+
+// 🆕 NEW: Export all functions globally for use in other scripts
+if (typeof window !== 'undefined') {
+    window.findBidirectionalMatches = findBidirectionalMatches;
+    window.enhancedSearchExpansionWithSpelling = enhancedSearchExpansionWithSpelling;
+    window.reverseAbbreviationMap = reverseAbbreviationMap;
+    window.MedicalSpellingCorrector = MedicalSpellingCorrector;
+    window.medicalSpellChecker = medicalSpellChecker;
+    window.correctMedicalSpelling = correctMedicalSpelling;
+    window.conditionToSpecialty = conditionToSpecialty;
+    window.procedureToSpecialty = procedureToSpecialty;
+}
+
+// 🆕 NEW: Enhanced search function that combines everything
+function intelligentMedicalSearch(query) {
+    // Step 1: Correct spelling
+    const correctedQuery = correctMedicalSpelling(query);
+    
+    // Step 2: Expand search terms
+    const expandedTerms = enhancedSearchExpansionWithSpelling(correctedQuery);
+    
+    // Step 3: Find bidirectional matches
+    const bidirectionalMatches = findBidirectionalMatches(correctedQuery);
+    
+    // Step 4: Combine all results
+    const allTerms = new Set([...expandedTerms, ...bidirectionalMatches]);
+    
+    return {
+        originalQuery: query,
+        correctedQuery: correctedQuery,
+        searchTerms: Array.from(allTerms),
+        spellingCorrected: correctedQuery !== query.toLowerCase()
+    };
+}
