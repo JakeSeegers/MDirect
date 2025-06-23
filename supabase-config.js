@@ -158,7 +158,7 @@ async function signInWithGoogle() {
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: window.location.origin
+                redirectTo: https://github.com/JakeSeegers/MDirect
             }
         });
         
