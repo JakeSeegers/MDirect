@@ -1,8 +1,8 @@
 // === SECURE SUPABASE CONFIG - REPLACE YOUR ENTIRE supabase-config.js ===
 
 // ✅ SAFE: Modern publishable key (secure for client-side use)
-const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_HBT2NPpEPDggpLiEG4RllQ_KDJhp0yp';
+const SUPABASE_URL = 'https://azguoragwmziaxwiyebb.supabase.co';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_kfF8UkBRp7jaZMJCXTpUgQ_-TXYv4lq';
 
 let supabaseClient = null;
 
