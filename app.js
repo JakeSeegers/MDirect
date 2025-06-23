@@ -1,14 +1,250 @@
-// --- MAIN APP LOGIC, EVENT LISTENERS, MODAL HANDLING ---
+// --- ENHANCED APP LOGIC WITH AUTHENTICATION ---
 
 let currentRoomIdForModal = null;
 
-// --- MODAL FUNCTIONS ---
+// --- AUTHENTICATION FUNCTIONS ---
+function updateAuthenticationUI() {
+    const signedOut = document.getElementById('auth-signed-out');
+    const signedIn = document.getElementById('auth-signed-in');
+    const userAvatar = document.getElementById('user-avatar');
+    const userName = document.getElementById('user-name');
+    const userEmail = document.getElementById('user-email');
+    const authRequiredModal = document.getElementById('auth-required-modal');
+    
+    const isAuthenticated = window.workspaceCollaboration?.collaborationState?.isAuthenticated || false;
+    const user = window.workspaceCollaboration?.collaborationState?.currentUser;
+    const userProfile = window.workspaceCollaboration?.collaborationState?.userProfile;
+    
+    if (isAuthenticated && user) {
+        // Show authenticated UI
+        if (signedOut) signedOut.classList.add('hidden');
+        if (signedIn) signedIn.classList.remove('hidden');
+        
+        // Update user info
+        if (userAvatar) {
+            userAvatar.src = user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=00274C&color=fff`;
+        }
+        if (userName) {
+            userName.textContent = userProfile?.full_name || user.user_metadata?.full_name || user.email.split('@')[0];
+        }
+        if (userEmail) {
+            userEmail.textContent = user.email;
+        }
+        
+        // Hide auth required modal if showing
+        if (authRequiredModal) authRequiredModal.classList.add('hidden');
+        
+        // Enable application features
+        enableApplicationFeatures();
+        
+    } else {
+        // Show sign-in UI
+        if (signedOut) signedOut.classList.remove('hidden');
+        if (signedIn) signedIn.classList.add('hidden');
+        
+        // Disable application features for non-authenticated users
+        disableApplicationFeatures();
+    }
+}
+
+function enableApplicationFeatures() {
+    // Enable upload and search functionality
+    const uploadArea = elements.universalUploadArea;
+    const searchInputs = [elements.searchInput, elements.searchInputMobile];
+    const filters = [
+        elements.buildingFilter, elements.floorFilter, elements.tagFilter, elements.resultsPerPage,
+        elements.buildingFilterMobile, elements.floorFilterMobile, elements.tagFilterMobile, elements.resultsPerPageMobile
+    ];
+    
+    if (uploadArea) {
+        uploadArea.style.pointerEvents = 'auto';
+        uploadArea.style.opacity = '1';
+    }
+    
+    searchInputs.forEach(input => {
+        if (input) {
+            input.disabled = false;
+            input.placeholder = input.id.includes('mobile') ? 
+                "Search rooms, types, staff..." : 
+                "Search rooms, types, staff... Try 'Building: [name]'";
+        }
+    });
+    
+    filters.forEach(filter => {
+        if (filter) filter.disabled = false;
+    });
+}
+
+function disableApplicationFeatures() {
+    // Show auth required modal when user tries to interact
+    const searchInputs = [elements.searchInput, elements.searchInputMobile];
+    
+    searchInputs.forEach(input => {
+        if (input) {
+            input.disabled = true;
+            input.placeholder = "Sign in to search rooms...";
+        }
+    });
+}
+
+function showAuthRequiredModal() {
+    const modal = document.getElementById('auth-required-modal');
+    if (modal) {
+        modal.classList.remove('hidden');
+    }
+}
+
+// --- USER PROFILE FUNCTIONS ---
+function showUserProfileModal() {
+    const modal = document.getElementById('user-profile-modal');
+    if (!modal) return;
+    
+    const user = window.workspaceCollaboration?.collaborationState?.currentUser;
+    const userProfile = window.workspaceCollaboration?.collaborationState?.userProfile;
+    
+    if (!user) return;
+    
+    // Populate profile data
+    const profileAvatar = document.getElementById('profile-avatar');
+    const profileName = document.getElementById('profile-name');
+    const profileEmail = document.getElementById('profile-email');
+    const profileDepartment = document.getElementById('profile-department');
+    const departmentInput = document.getElementById('department-input');
+    
+    if (profileAvatar) {
+        profileAvatar.src = user.user_metadata?.avatar_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(user.email)}&background=00274C&color=fff`;
+    }
+    if (profileName) {
+        profileName.textContent = userProfile?.full_name || user.user_metadata?.full_name || user.email.split('@')[0];
+    }
+    if (profileEmail) {
+        profileEmail.textContent = user.email;
+    }
+    if (profileDepartment) {
+        profileDepartment.textContent = userProfile?.department || 'No department set';
+    }
+    if (departmentInput) {
+        departmentInput.value = userProfile?.department || '';
+    }
+    
+    // Load user workspaces
+    loadUserWorkspaces();
+    
+    modal.classList.remove('hidden');
+}
+
+function hideUserProfileModal() {
+    const modal = document.getElementById('user-profile-modal');
+    if (modal) {
+        modal.classList.add('hidden');
+    }
+}
+
+async function saveUserProfile() {
+    const departmentInput = document.getElementById('department-input');
+    const department = departmentInput?.value?.trim() || '';
+    
+    const user = window.workspaceCollaboration?.collaborationState?.currentUser;
+    if (!user) return;
+    
+    try {
+        // Update user profile in database
+        const { error } = await window.workspaceCollaboration.supabaseClient
+            .from('user_profiles')
+            .update({ department })
+            .eq('id', user.id);
+            
+        if (error) throw error;
+        
+        // Update local state
+        if (window.workspaceCollaboration.collaborationState.userProfile) {
+            window.workspaceCollaboration.collaborationState.userProfile.department = department;
+        }
+        
+        showNotification('✅ Profile updated successfully');
+        hideUserProfileModal();
+        updateAuthenticationUI();
+        
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        showNotification('❌ Failed to update profile', 'error');
+    }
+}
+
+async function loadUserWorkspaces() {
+    const workspacesList = document.getElementById('user-workspaces-list');
+    if (!workspacesList) return;
+    
+    const user = window.workspaceCollaboration?.collaborationState?.currentUser;
+    if (!user) return;
+    
+    try {
+        // Get user's workspaces using the database function
+        const { data: workspaces, error } = await window.workspaceCollaboration.supabaseClient
+            .rpc('get_user_workspaces', { user_id: user.id });
+            
+        if (error) throw error;
+        
+        workspacesList.innerHTML = '';
+        
+        if (workspaces && workspaces.length > 0) {
+            workspaces.forEach(workspace => {
+                const workspaceItem = document.createElement('div');
+                workspaceItem.className = 'workspace-item';
+                if (window.workspaceCollaboration.collaborationState.currentWorkspace?.id === workspace.workspace_id) {
+                    workspaceItem.classList.add('active');
+                }
+                
+                workspaceItem.innerHTML = `
+                    <div class="flex justify-between items-start">
+                        <div>
+                            <h5 class="font-medium text-um-blue">${sanitizeHTML(workspace.workspace_name)}</h5>
+                            <p class="text-xs text-gray-600">${workspace.user_role} • ${workspace.member_count} members</p>
+                        </div>
+                        <span class="text-xs text-gray-500">${workspace.tag_count} tags</span>
+                    </div>
+                `;
+                
+                workspaceItem.addEventListener('click', () => {
+                    if (window.workspaceCollaboration.collaborationState.currentWorkspace?.id !== workspace.workspace_id) {
+                        joinWorkspaceById(workspace.workspace_id, workspace.workspace_name);
+                    }
+                });
+                
+                workspacesList.appendChild(workspaceItem);
+            });
+        } else {
+            workspacesList.innerHTML = '<p class="text-sm text-gray-500 text-center py-4">No workspaces yet. Create or join one to get started!</p>';
+        }
+        
+    } catch (error) {
+        console.error('Error loading workspaces:', error);
+        workspacesList.innerHTML = '<p class="text-sm text-red-600 text-center py-4">Failed to load workspaces</p>';
+    }
+}
+
+async function joinWorkspaceById(workspaceId, workspaceName) {
+    try {
+        const result = await window.workspaceCollaboration.joinWorkspace(workspaceName);
+        if (result.success) {
+            hideUserProfileModal();
+            updateCollaborationUI();
+            showNotification(`✅ Switched to workspace "${workspaceName}"`);
+        }
+    } catch (error) {
+        console.error('Error joining workspace:', error);
+        showNotification('❌ Failed to join workspace', 'error');
+    }
+}
+
+// --- ENHANCED MODAL FUNCTIONS ---
 function showWelcomeModal() {
     if (!elements.welcomeModal || (elements.dontShowAgain && localStorage.getItem('hideWelcomeModal') === 'true')) {
         return;
     }
     elements.welcomeModal.classList.remove('hidden');
 }
+
 function hideWelcomeModal() {
     if (!elements.welcomeModal) return;
     elements.welcomeModal.classList.add('hidden');
@@ -21,7 +257,7 @@ function showSecurityReminder() {
     if (state.hideSecurityReminder || !elements.securityReminderModal) return;
     elements.securityReminderModal.classList.remove('hidden');
 }
-window.showSecurityReminder = showSecurityReminder; // Make global for data.js
+window.showSecurityReminder = showSecurityReminder;
 
 function hideSecurityReminder() {
     if (!elements.securityReminderModal) return;
@@ -37,14 +273,21 @@ function showMgisComplianceModal() {
     elements.mgisComplianceCheckbox.checked = false;
     elements.mgisExportConfirmBtn.disabled = true;
 }
+
 function hideMgisComplianceModal() {
     if (elements.mgisComplianceModal) {
         elements.mgisComplianceModal.classList.add('hidden');
     }
 }
 
-// --- WORKSPACE COLLABORATION MODAL FUNCTIONS ---
+// --- ENHANCED WORKSPACE COLLABORATION FUNCTIONS ---
 function handleCollaborationButtonClick() {
+    // Check authentication first
+    if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+        showAuthRequiredModal();
+        return;
+    }
+    
     if (window.workspaceCollaboration.collaborationState.isOnline) {
         // Already connected, offer to leave workspace
         const workspaceName = window.workspaceCollaboration.collaborationState.currentWorkspace?.name;
@@ -100,7 +343,7 @@ function hideJoinWorkspaceModal() {
 }
 
 function clearCreateWorkspaceForm() {
-    const fields = ['new-workspace-name', 'new-workspace-password', 'workspace-creator-name'];
+    const fields = ['new-workspace-name', 'new-workspace-description'];
     fields.forEach(fieldId => {
         const field = document.getElementById(fieldId);
         if (field) field.value = '';
@@ -108,24 +351,19 @@ function clearCreateWorkspaceForm() {
 }
 
 function clearJoinWorkspaceForm() {
-    const fields = ['join-workspace-name', 'join-workspace-password', 'join-user-name'];
-    fields.forEach(fieldId => {
-        const field = document.getElementById(fieldId);
-        if (field) field.value = '';
-    });
+    const field = document.getElementById('join-workspace-name');
+    if (field) field.value = '';
 }
 
 async function createWorkspace() {
     const nameField = document.getElementById('new-workspace-name');
-    const passwordField = document.getElementById('new-workspace-password');
-    const creatorField = document.getElementById('workspace-creator-name');
+    const descriptionField = document.getElementById('new-workspace-description');
     
     const workspaceName = nameField?.value?.trim();
-    const password = passwordField?.value?.trim();
-    const creatorName = creatorField?.value?.trim();
+    const description = descriptionField?.value?.trim() || '';
     
-    if (!workspaceName || !password || !creatorName) {
-        alert('Please fill in all required fields');
+    if (!workspaceName) {
+        alert('Please enter a workspace name');
         return;
     }
     
@@ -134,22 +372,17 @@ async function createWorkspace() {
         return;
     }
     
-    if (password.length < 4) {
-        alert('Password must be at least 4 characters');
-        return;
-    }
-    
     try {
         showLoading(true);
         
-        const result = await window.workspaceCollaboration.createWorkspace(workspaceName, password, creatorName);
+        const result = await window.workspaceCollaboration.createWorkspace(workspaceName, description);
         
         if (result.success) {
             hideCreateWorkspaceModal();
-            showCollaborationNotification(`✅ Workspace "${workspaceName}" created! You're now connected.`);
+            showNotification(`✅ Workspace "${workspaceName}" created! You're now connected.`);
             
             // Automatically join the created workspace
-            const joinResult = await window.workspaceCollaboration.joinWorkspace(workspaceName, password, creatorName);
+            const joinResult = await window.workspaceCollaboration.joinWorkspace(workspaceName);
             if (joinResult.success) {
                 updateCollaborationUI();
             }
@@ -166,26 +399,21 @@ async function createWorkspace() {
 
 async function joinWorkspace() {
     const nameField = document.getElementById('join-workspace-name');
-    const passwordField = document.getElementById('join-workspace-password');
-    const userField = document.getElementById('join-user-name');
-    
     const workspaceName = nameField?.value?.trim();
-    const password = passwordField?.value?.trim();
-    const userName = userField?.value?.trim();
     
-    if (!workspaceName || !password || !userName) {
-        alert('Please fill in all required fields');
+    if (!workspaceName) {
+        alert('Please enter a workspace name');
         return;
     }
     
     try {
         showLoading(true);
         
-        const result = await window.workspaceCollaboration.joinWorkspace(workspaceName, password, userName);
+        const result = await window.workspaceCollaboration.joinWorkspace(workspaceName);
         
         if (result.success) {
             hideJoinWorkspaceModal();
-            showCollaborationNotification(`✅ Joined workspace "${workspaceName}"!`);
+            showNotification(`✅ Joined workspace "${workspaceName}"!`);
             updateCollaborationUI();
         } else {
             alert('Failed to join workspace: ' + result.error);
@@ -201,60 +429,91 @@ async function joinWorkspace() {
 function updateCollaborationUI() {
     const collabButton = elements.collaborationBtn;
     const collabStatus = elements.collaborationStatus;
+    const collabButtonText = document.getElementById('collaboration-btn-text');
+    const workspaceNameElement = document.getElementById('workspace-name');
     
-    if (window.workspaceCollaboration.collaborationState.isOnline) {
+    if (window.workspaceCollaboration?.collaborationState?.isOnline) {
         const workspaceName = window.workspaceCollaboration.collaborationState.currentWorkspace?.name;
         
         if (collabButton) {
-            collabButton.innerHTML = `
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                </svg>
-                Connected: ${workspaceName}
-            `;
             collabButton.classList.remove('um-button-blue');
             collabButton.classList.add('um-button-maize');
         }
         
+        if (collabButtonText) {
+            collabButtonText.textContent = `Connected: ${workspaceName}`;
+        }
+        
+        if (workspaceNameElement) {
+            workspaceNameElement.textContent = `Team Collaboration: ${workspaceName}`;
+        }
+        
         if (collabStatus) {
             collabStatus.classList.remove('hidden');
+            updateOnlineUsersDisplay();
         }
     } else {
         if (collabButton) {
-            collabButton.innerHTML = `
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/>
-                </svg>
-                Join Workspace
-            `;
             collabButton.classList.remove('um-button-maize');
             collabButton.classList.add('um-button-blue');
+        }
+        
+        if (collabButtonText) {
+            collabButtonText.textContent = 'Join Workspace';
         }
         
         if (collabStatus) {
             collabStatus.classList.add('hidden');
         }
     }
+    
+    updateWorkspaceTaggingOption();
 }
 
-function showCollaborationNotification(message) {
-    // Create a toast notification
+function updateOnlineUsersDisplay() {
+    const onlineUsersContainer = document.getElementById('online-users');
+    if (!onlineUsersContainer) return;
+    
+    const connectedUsers = window.workspaceCollaboration?.collaborationState?.connectedUsers;
+    if (!connectedUsers || connectedUsers.size === 0) {
+        onlineUsersContainer.innerHTML = '<p class="text-sm text-green-600">You are the only one online</p>';
+        return;
+    }
+    
+    onlineUsersContainer.innerHTML = '';
+    
+    connectedUsers.forEach((presence, userName) => {
+        const userBadge = document.createElement('div');
+        userBadge.className = 'online-user-badge';
+        userBadge.innerHTML = `
+            <div class="online-indicator"></div>
+            <span>${sanitizeHTML(userName)}</span>
+        `;
+        onlineUsersContainer.appendChild(userBadge);
+    });
+}
+
+function showNotification(message, type = 'info') {
     const notification = document.createElement('div');
-    notification.className = 'fixed top-16 right-4 bg-blue-100 border border-blue-300 text-blue-800 px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
+    notification.className = `notification-toast ${type}`;
+    
+    const icon = type === 'success' ? '✅' : type === 'error' ? '❌' : type === 'warning' ? '⚠️' : 'ℹ️';
+    
     notification.innerHTML = `
-        <div class="flex items-center gap-2">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"/>
-            </svg>
-            <span class="text-sm">${sanitizeHTML(message)}</span>
+        <div class="flex items-center gap-3">
+            <span class="text-lg">${icon}</span>
+            <span class="text-sm font-medium">${sanitizeHTML(message)}</span>
         </div>
     `;
     
     document.body.appendChild(notification);
     
-    // Remove after 4 seconds
+    // Show notification
+    setTimeout(() => notification.classList.add('show'), 100);
+    
+    // Hide and remove notification
     setTimeout(() => {
-        notification.style.opacity = '0';
+        notification.classList.remove('show');
         setTimeout(() => {
             if (document.body.contains(notification)) {
                 document.body.removeChild(notification);
@@ -263,6 +522,7 @@ function showCollaborationNotification(message) {
     }, 4000);
 }
 
+// --- TAG MANAGEMENT FUNCTIONS ---
 function displayTagInfo(tag) {
     if (!elements.tagInfoModal || !elements.tagInfoTitle || !elements.tagInfoContent) return;
     if (!tag || !(tag.isRich || tag.description || tag.link || tag.imageUrl || tag.contact)) return;
@@ -283,9 +543,8 @@ function displayTagInfo(tag) {
     elements.tagInfoContent.innerHTML = content;
     elements.tagInfoModal.classList.remove('hidden');
 }
-window.displayTagInfo = displayTagInfo; // Make global for ui.js
+window.displayTagInfo = displayTagInfo;
 
-// 🎯 NEW: Update workspace tagging option visibility
 function updateWorkspaceTaggingOption() {
     const workspaceOption = document.getElementById('workspace-sharing-option');
     const workspaceNameDisplay = document.getElementById('workspace-name-display');
@@ -303,8 +562,13 @@ function updateWorkspaceTaggingOption() {
     }
 }
 
-// 🎯 UPDATED: Handle add tag click with workspace option
 function handleAddTagClick(roomId) {
+    // Check authentication first
+    if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+        showAuthRequiredModal();
+        return;
+    }
+    
     const room = state.processedData.find(r => r.id.toString() === roomId.toString()) || state.currentFilteredData.find(r => r.id.toString() === roomId.toString());
     if (!room || !elements.customTagModal || !elements.modalRoomInfo) return;
     
@@ -314,7 +578,7 @@ function handleAddTagClick(roomId) {
     
     updateCustomTagsModalDisplay();
     clearTagForm();
-    updateWorkspaceTaggingOption(); // 🎯 NEW: Update workspace sharing option
+    updateWorkspaceTaggingOption();
     elements.customTagModal.classList.remove('hidden');
     if(elements.tagNameInput) elements.tagNameInput.focus();
 }
@@ -363,32 +627,45 @@ function createTagElementInModal(tagData, type, removable) {
     
     // Add workspace indicator for workspace tags
     if (tagData.workspace) {
-        const workspaceIndicator = document.createElement('div');
-        workspaceIndicator.className = 'absolute -top-1 -right-1 w-3 h-3 bg-blue-500 rounded-full border border-white';
-        workspaceIndicator.title = `Workspace tag by ${tagData.created_by || 'team member'}`;
-        span.style.position = 'relative';
-        span.appendChild(workspaceIndicator);
+        span.classList.add('workspace-tag');
+        span.title = `Workspace tag by ${tagData.created_by || 'team member'}`;
     }
     
-    // Only show rich tag indicator if there's actual rich content (not just color/type changes)
+    // Only show rich tag indicator if there's actual rich content
     if (isRichTagObject && (tagData.description || tagData.link || tagData.imageUrl || tagData.contact)) {
-        span.classList.add('rich-tag'); span.style.cursor = 'pointer';
-        span.onclick = () => displayTagInfo(tagData); // Direct call
+        span.classList.add('rich-tag'); 
+        span.style.cursor = 'pointer';
+        span.onclick = () => displayTagInfo(tagData);
     }
-    if (!removable || !removeBtn) removeBtn?.remove();
-    else {
+    
+    if (!removable || !removeBtn) {
+        removeBtn?.remove();
+    } else {
         removeBtn.dataset.tagId = tagData.id;
-        if (['maize', 'yellow', 'orange', 'lightblue'].includes(color)) removeBtn.classList.add('text-um-text-on-maize', 'hover:text-red-700');
-        else removeBtn.classList.add('text-gray-300', 'hover:text-white');
+        if (['maize', 'yellow', 'orange', 'lightblue'].includes(color)) {
+            removeBtn.classList.add('text-um-text-on-maize', 'hover:text-red-700');
+        } else {
+            removeBtn.classList.add('text-gray-300', 'hover:text-white');
+        }
     }
+    
     return span;
 }
 
-// 🎯 UPDATED: Add rich tag from modal with workspace sharing option
 async function addRichTagFromModal() {
     if (!currentRoomIdForModal) return;
+    
+    // Check authentication
+    if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+        showAuthRequiredModal();
+        return;
+    }
+    
     const name = elements.tagNameInput?.value?.trim() || '';
-    if (!name) { alert('Please enter a tag name.'); return; }
+    if (!name) { 
+        alert('Please enter a tag name.'); 
+        return; 
+    }
 
     const type = elements.tagTypeSelect?.value || 'simple';
     const description = elements.tagDescriptionInput?.value?.trim() || '';
@@ -398,65 +675,45 @@ async function addRichTagFromModal() {
     const selectedColorEl = document.querySelector('#custom-tag-modal .color-option.selected');
     const color = selectedColorEl ? selectedColorEl.dataset.color : 'blue';
     
-    // 🎯 NEW: Check if user wants to share to workspace
     const shareToWorkspace = document.getElementById('share-to-workspace-checkbox')?.checked || false;
     
-    const newRichTag = createRichTag(name, type, description, link, contact, imageUrl, color); // Direct call to utils.js function
+    const newRichTag = createRichTag(name, type, description, link, contact, imageUrl, color);
 
     if (!state.customTags[currentRoomIdForModal]) state.customTags[currentRoomIdForModal] = [];
     if (state.customTags[currentRoomIdForModal].some(tag => tag.name.toLowerCase() === newRichTag.name.toLowerCase())) {
-        alert(`A tag with the name "${newRichTag.name}" already exists for this room.`); return;
+        alert(`A tag with the name "${newRichTag.name}" already exists for this room.`); 
+        return;
     }
     
     // Add to local state first
     state.customTags[currentRoomIdForModal].push(newRichTag);
     
-    // 🎯 NEW: Save to workspace if user chose to share AND connected
-    if (shareToWorkspace && window.workspaceCollaboration.collaborationState.isOnline) {
+    // Save to workspace if user chose to share AND connected
+    if (shareToWorkspace && window.workspaceCollaboration?.collaborationState?.isOnline) {
         console.log('🔄 Sharing tag to workspace...', newRichTag);
         
-        // 🔍 COMPREHENSIVE DEBUG
-        console.log('🔍 window.workspaceCollaboration exists:', !!window.workspaceCollaboration);
-        console.log('🔍 saveTagToWorkspace function exists:', !!window.workspaceCollaboration?.saveTagToWorkspace);
-        console.log('🔍 collaborationState:', window.workspaceCollaboration?.collaborationState);
-        console.log('🔍 currentRoomIdForModal:', currentRoomIdForModal);
-        console.log('🔍 state.processedData length:', state?.processedData?.length);
-        
-        // Check if the function exists
-        if (!window.workspaceCollaboration?.saveTagToWorkspace) {
-            console.error('❌ saveTagToWorkspace function not found!');
-            alert('Workspace function not available. Check console for details.');
-            return;
-        }
-        
         try {
-            console.log('🔍 About to call saveTagToWorkspace...');
             const success = await window.workspaceCollaboration.saveTagToWorkspace(currentRoomIdForModal, newRichTag);
-            console.log('🔍 saveTagToWorkspace returned:', success, typeof success);
             
             if (success === true) {
                 // Mark as workspace tag
                 newRichTag.workspace = true;
-                newRichTag.created_by = window.workspaceCollaboration.collaborationState.currentUser?.name;
+                newRichTag.created_by = window.workspaceCollaboration.collaborationState.userProfile?.full_name || 
+                                       window.workspaceCollaboration.collaborationState.currentUser?.email;
                 console.log('✅ Tag shared to workspace successfully');
                 
-                // Show success notification
                 const workspaceName = window.workspaceCollaboration.collaborationState.currentWorkspace?.name;
-                showCollaborationNotification(`✅ Tag "${newRichTag.name}" shared with "${workspaceName}"`);
+                showNotification(`✅ Tag "${newRichTag.name}" shared with "${workspaceName}"`);
             } else {
-                console.error('❌ Failed to share tag to workspace - function returned:', success);
-                alert('Failed to share tag to workspace. Tag saved locally only.');
+                console.error('❌ Failed to share tag to workspace');
+                showNotification('Failed to share tag to workspace. Tag saved locally only.', 'warning');
             }
         } catch (error) {
             console.error('❌ Error sharing tag to workspace:', error);
-            console.error('❌ Error details:', error.message, error.stack);
-            alert('Error sharing tag to workspace: ' + error.message);
+            showNotification('Error sharing tag to workspace: ' + error.message, 'error');
         }
     } else if (shareToWorkspace && !window.workspaceCollaboration?.collaborationState?.isOnline) {
-        console.warn('⚠️ Not connected to workspace');
-        alert('Not connected to workspace. Tag saved locally only.');
-    } else {
-        console.log('🔍 Workspace sharing skipped - shareToWorkspace:', shareToWorkspace, 'isOnline:', window.workspaceCollaboration?.collaborationState?.isOnline);
+        showNotification('Not connected to workspace. Tag saved locally only.', 'warning');
     }
     
     clearTagForm();
@@ -480,8 +737,8 @@ function clearTagForm() {
 async function saveCustomTagsFromModal() {
     closeTagModal();
     state.currentPage = 1;
-    await createSearchIndex(); // Direct call to data.js function
-    await updateResults();       // Direct call to ui.js function
+    await createSearchIndex();
+    await updateResults();
 }
 
 async function removeCustomTag(tagId, roomId) {
@@ -496,15 +753,14 @@ async function removeCustomTag(tagId, roomId) {
     const tagToRemove = roomTags[tagIndex];
     
     // Remove from workspace if it's a workspace tag
-    if (tagToRemove.workspace && window.workspaceCollaboration.collaborationState.isOnline) {
+    if (tagToRemove.workspace && window.workspaceCollaboration?.collaborationState?.isOnline) {
         try {
             const success = await window.workspaceCollaboration.removeTagFromWorkspace(roomId, tagToRemove);
             if (success) {
-                showCollaborationNotification(`🗑️ Tag "${tagToRemove.name}" removed from workspace`);
+                showNotification(`🗑️ Tag "${tagToRemove.name}" removed from workspace`);
             }
         } catch (error) {
             console.error('Failed to delete tag from workspace:', error);
-            // Continue with local deletion
         }
     }
     
@@ -513,24 +769,64 @@ async function removeCustomTag(tagId, roomId) {
     updateCustomTagsModalDisplay();
 }
 
+// --- PAGINATION FUNCTIONS ---
 function goToPage(pageNumber) {
     const totalItems = state.currentFilteredData.length;
     if (state.resultsPerPage === 0 && pageNumber !== 1) return;
     const totalPages = (state.resultsPerPage === 0) ? 1 : Math.ceil(totalItems / state.resultsPerPage);
     if (pageNumber >= 1 && pageNumber <= totalPages) {
         state.currentPage = pageNumber;
-        updateResults(); // Direct call to ui.js function
+        updateResults();
     }
 }
 
+// --- EVENT LISTENERS SETUP ---
 function setupEventListeners() {
-    if (elements.selectDesktopViewBtn) elements.selectDesktopViewBtn.addEventListener('click', () => setViewMode('desktop', true)); // Direct call
-    if (elements.selectMobileViewBtn) elements.selectMobileViewBtn.addEventListener('click', () => setViewMode('mobile', true));   // Direct call
-    if (elements.viewSwitchBtn) elements.viewSwitchBtn.addEventListener('click', () => setViewMode(state.currentViewMode === 'desktop' ? 'mobile' : 'desktop')); // Direct call
+    // View switching
+    if (elements.selectDesktopViewBtn) elements.selectDesktopViewBtn.addEventListener('click', () => setViewMode('desktop', true));
+    if (elements.selectMobileViewBtn) elements.selectMobileViewBtn.addEventListener('click', () => setViewMode('mobile', true));
+    if (elements.viewSwitchBtn) elements.viewSwitchBtn.addEventListener('click', () => setViewMode(state.currentViewMode === 'desktop' ? 'mobile' : 'desktop'));
 
-    if (elements.uploadHeader) elements.uploadHeader.addEventListener('click', toggleUploadSection); // Direct call
+    // Upload section
+    if (elements.uploadHeader) elements.uploadHeader.addEventListener('click', toggleUploadSection);
 
-    // NEW Workspace collaboration event listeners
+    // Authentication event listeners
+    if (document.getElementById('google-sign-in-btn')) {
+        document.getElementById('google-sign-in-btn').addEventListener('click', async () => {
+            await window.workspaceCollaboration.signInWithGoogle();
+        });
+    }
+
+    if (document.getElementById('auth-modal-sign-in-btn')) {
+        document.getElementById('auth-modal-sign-in-btn').addEventListener('click', async () => {
+            await window.workspaceCollaboration.signInWithGoogle();
+        });
+    }
+
+    if (document.getElementById('sign-out-btn')) {
+        document.getElementById('sign-out-btn').addEventListener('click', async () => {
+            await window.workspaceCollaboration.signOut();
+        });
+    }
+
+    // User profile management
+    if (document.getElementById('user-profile-btn')) {
+        document.getElementById('user-profile-btn').addEventListener('click', showUserProfileModal);
+    }
+
+    if (document.getElementById('close-profile-modal')) {
+        document.getElementById('close-profile-modal').addEventListener('click', hideUserProfileModal);
+    }
+
+    if (document.getElementById('close-profile-btn')) {
+        document.getElementById('close-profile-btn').addEventListener('click', hideUserProfileModal);
+    }
+
+    if (document.getElementById('save-profile-btn')) {
+        document.getElementById('save-profile-btn').addEventListener('click', saveUserProfile);
+    }
+
+    // Workspace collaboration event listeners
     if (elements.collaborationBtn) {
         elements.collaborationBtn.addEventListener('click', handleCollaborationButtonClick);
     }
@@ -590,45 +886,147 @@ function setupEventListeners() {
         });
     }
 
+    const userProfileModal = document.getElementById('user-profile-modal');
+    if (userProfileModal) {
+        userProfileModal.addEventListener('click', (e) => {
+            if (e.target === userProfileModal) hideUserProfileModal();
+        });
+    }
+
+    // Auth required modal click outside to close
+    const authRequiredModal = document.getElementById('auth-required-modal');
+    if (authRequiredModal) {
+        authRequiredModal.addEventListener('click', (e) => {
+            if (e.target === authRequiredModal) {
+                authRequiredModal.classList.add('hidden');
+            }
+        });
+    }
+
+    // Upload functionality - check authentication
     const uploadArea = elements.universalUploadArea;
     const uploadInput = elements.universalUploadInput;
     if (uploadArea && uploadInput) {
-        uploadArea.addEventListener('click', (e) => { if (e.target === uploadArea || e.target.closest('#upload-content-normal') || e.target.closest('#upload-content-empty')) uploadInput.click(); });
-        uploadArea.addEventListener('dragover', (e) => { e.preventDefault(); e.stopPropagation(); uploadArea.classList.add('dragover'); });
-        uploadArea.addEventListener('dragleave', (e) => { e.preventDefault(); e.stopPropagation(); uploadArea.classList.remove('dragover'); });
-        uploadArea.addEventListener('drop', (e) => { e.preventDefault(); e.stopPropagation(); uploadArea.classList.remove('dragover'); handleFiles(e.dataTransfer.files); }); // Direct call
-        uploadInput.addEventListener('change', (e) => handleFiles(e.target.files)); // Direct call
+        uploadArea.addEventListener('click', (e) => {
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                return;
+            }
+            if (e.target === uploadArea || e.target.closest('#upload-content-normal') || e.target.closest('#upload-content-empty')) {
+                uploadInput.click();
+            }
+        });
+        
+        uploadArea.addEventListener('dragover', (e) => {
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                e.preventDefault();
+                e.stopPropagation();
+                return;
+            }
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            uploadArea.classList.add('dragover');
+        });
+        
+        uploadArea.addEventListener('dragleave', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            uploadArea.classList.remove('dragover'); 
+        });
+        
+        uploadArea.addEventListener('drop', (e) => { 
+            e.preventDefault(); 
+            e.stopPropagation(); 
+            uploadArea.classList.remove('dragover');
+            
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                return;
+            }
+            
+            handleFiles(e.dataTransfer.files);
+        });
+        
+        uploadInput.addEventListener('change', (e) => {
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                return;
+            }
+            handleFiles(e.target.files);
+        });
     }
 
-    if (elements.exportTagsBtn) elements.exportTagsBtn.addEventListener('click', (e) => { e.stopPropagation(); exportCustomTags(); }); // Direct call
-    if (elements.exportSessionBtn) elements.exportSessionBtn.addEventListener('click', (e) => { e.stopPropagation(); showMgisComplianceModal(); });
+    // Export functionality - check authentication
+    if (elements.exportTagsBtn) {
+        elements.exportTagsBtn.addEventListener('click', (e) => { 
+            e.stopPropagation();
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                return;
+            }
+            exportCustomTags();
+        });
+    }
+    
+    if (elements.exportSessionBtn) {
+        elements.exportSessionBtn.addEventListener('click', (e) => { 
+            e.stopPropagation();
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                return;
+            }
+            showMgisComplianceModal();
+        });
+    }
 
+    // MGIS compliance modal
     if (elements.closeMgisModal) elements.closeMgisModal.addEventListener('click', hideMgisComplianceModal);
     if (elements.mgisComplianceModal) elements.mgisComplianceModal.addEventListener('click', (e) => { if (e.target === elements.mgisComplianceModal) hideMgisComplianceModal(); });
     if (elements.mgisComplianceCheckbox) elements.mgisComplianceCheckbox.addEventListener('change', (e) => { elements.mgisExportConfirmBtn.disabled = !e.target.checked; });
     if (elements.mgisCancelBtn) elements.mgisCancelBtn.addEventListener('click', hideMgisComplianceModal);
-    if (elements.mgisExportConfirmBtn) elements.mgisExportConfirmBtn.addEventListener('click', () => { hideMgisComplianceModal(); exportSession(); }); // Direct call
+    if (elements.mgisExportConfirmBtn) elements.mgisExportConfirmBtn.addEventListener('click', () => { hideMgisComplianceModal(); exportSession(); });
 
-    const debouncedSearch = debounce(() => { state.currentPage = 1; updateResults(); }, 350); // Direct call
+    // Search functionality - add authentication check
+    const debouncedSearch = debounce(() => { 
+        if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+            showAuthRequiredModal();
+            return;
+        }
+        state.currentPage = 1; 
+        updateResults(); 
+    }, 350);
 
     if (elements.searchInput) {
         elements.searchInput.addEventListener('input', (e) => {
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                e.target.blur();
+                return;
+            }
             state.searchQuery = e.target.value;
             if (elements.searchInputMobile) elements.searchInputMobile.value = state.searchQuery;
-            updateAutocomplete(state.searchQuery); // Direct call
+            updateAutocomplete(state.searchQuery);
             debouncedSearch();
         });
-        elements.searchInput.addEventListener('keydown', handleAutocompleteKeydown); // Direct call
-        elements.searchInput.addEventListener('blur', () => setTimeout(hideAutocomplete, 150)); // Direct call
+        elements.searchInput.addEventListener('keydown', handleAutocompleteKeydown);
+        elements.searchInput.addEventListener('blur', () => setTimeout(hideAutocomplete, 150));
     }
+    
     if (elements.searchForm) elements.searchForm.addEventListener('submit', (e) => e.preventDefault());
+    
     if (elements.searchInputMobile) {
         elements.searchInputMobile.addEventListener('input', (e) => {
+            if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+                showAuthRequiredModal();
+                e.target.blur();
+                return;
+            }
             state.searchQuery = e.target.value;
             if (elements.searchInput) elements.searchInput.value = state.searchQuery;
             debouncedSearch();
         });
     }
+    
     if (elements.autocompleteContainer) {
         elements.autocompleteContainer.addEventListener('mousedown', (e) => {
             const item = e.target.closest('[role="option"]');
@@ -638,24 +1036,25 @@ function setupEventListeners() {
                 elements.searchInput.value = selectedValue;
                 if (elements.searchInputMobile) elements.searchInputMobile.value = selectedValue;
                 state.searchQuery = selectedValue;
-                hideAutocomplete(); // Direct call
+                hideAutocomplete();
                 state.currentPage = 1;
-                updateResults(); // Direct call
+                updateResults();
             }
         });
     }
 
+    // Filter functionality
     ['building', 'floor'].forEach(filterType => {
         const desktopEl = elements[`${filterType}Filter`];
         const mobileEl = elements[`${filterType}FilterMobile`];
-        if (desktopEl) desktopEl.addEventListener('change', (e) => { state.activeFilters[filterType] = e.target.value; if (mobileEl) mobileEl.value = e.target.value; state.currentPage = 1; updateResults(); }); // Direct call
-        if (mobileEl) mobileEl.addEventListener('change', (e) => { state.activeFilters[filterType] = e.target.value; if (desktopEl) desktopEl.value = e.target.value; state.currentPage = 1; updateResults(); }); // Direct call
+        if (desktopEl) desktopEl.addEventListener('change', (e) => { state.activeFilters[filterType] = e.target.value; if (mobileEl) mobileEl.value = e.target.value; state.currentPage = 1; updateResults(); });
+        if (mobileEl) mobileEl.addEventListener('change', (e) => { state.activeFilters[filterType] = e.target.value; if (desktopEl) desktopEl.value = e.target.value; state.currentPage = 1; updateResults(); });
     });
 
     [elements.tagFilter, elements.tagFilterMobile].forEach(el => {
         if (el) el.addEventListener('change', (e) => {
             const selectedTag = e.target.value;
-            if (selectedTag && !state.activeFilters.tags.includes(selectedTag)) { state.activeFilters.tags.push(selectedTag); state.currentPage = 1; updateResults(); } // Direct call
+            if (selectedTag && !state.activeFilters.tags.includes(selectedTag)) { state.activeFilters.tags.push(selectedTag); state.currentPage = 1; updateResults(); }
             e.target.value = '';
             if (elements.tagFilter) elements.tagFilter.value = '';
             if (elements.tagFilterMobile) elements.tagFilterMobile.value = '';
@@ -664,22 +1063,25 @@ function setupEventListeners() {
 
     if (elements.activeTagsContainer) elements.activeTagsContainer.addEventListener('click', (e) => {
         const btn = e.target.closest('[data-action="remove-tag"]');
-        if (btn) { state.activeFilters.tags = state.activeFilters.tags.filter(t => t !== btn.dataset.tag); state.currentPage = 1; updateResults(); } // Direct call
+        if (btn) { state.activeFilters.tags = state.activeFilters.tags.filter(t => t !== btn.dataset.tag); state.currentPage = 1; updateResults(); }
     });
-    if (elements.clearTagsBtn) elements.clearTagsBtn.addEventListener('click', () => { state.activeFilters.tags = []; state.currentPage = 1; updateResults(); }); // Direct call
+    
+    if (elements.clearTagsBtn) elements.clearTagsBtn.addEventListener('click', () => { state.activeFilters.tags = []; state.currentPage = 1; updateResults(); });
 
     [elements.resultsPerPage, elements.resultsPerPageMobile].forEach(el => {
         if (el) el.addEventListener('change', (e) => {
             state.resultsPerPage = parseInt(e.target.value, 10);
             if (elements.resultsPerPage) elements.resultsPerPage.value = e.target.value;
             if (elements.resultsPerPageMobile) elements.resultsPerPageMobile.value = e.target.value;
-            state.currentPage = 1; updateResults(); // Direct call
+            state.currentPage = 1; updateResults();
         });
     });
 
+    // Pagination
     if (elements.prevPageBtn) elements.prevPageBtn.addEventListener('click', () => goToPage(state.currentPage - 1));
     if (elements.nextPageBtn) elements.nextPageBtn.addEventListener('click', () => goToPage(state.currentPage + 1));
 
+    // Other modals
     if (elements.closeSecurityModal) elements.closeSecurityModal.addEventListener('click', hideSecurityReminder);
     if (elements.securityOkBtn) elements.securityOkBtn.addEventListener('click', hideSecurityReminder);
     if (elements.closeWelcomeBtn) elements.closeWelcomeBtn.addEventListener('click', hideWelcomeModal);
@@ -698,36 +1100,60 @@ function setupEventListeners() {
     });
     if (elements.tagNameInput) elements.tagNameInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); addRichTagFromModal(); }});
 
+    // Tag buttons delegation
     function delegateAddTag(event) {
         const button = event.target.closest('[data-action="add-tag"]');
-        if (button) { const roomId = button.dataset.id; if (roomId) handleAddTagClick(roomId); }
+        if (button) { 
+            const roomId = button.dataset.id; 
+            if (roomId) handleAddTagClick(roomId); 
+        }
     }
     if (elements.resultsBody) elements.resultsBody.addEventListener('click', delegateAddTag);
     if (elements.mobileResults) elements.mobileResults.addEventListener('click', delegateAddTag);
 
+    // Color picker
     const colorPicker = document.querySelector('#custom-tag-modal .color-picker');
     if (colorPicker) colorPicker.addEventListener('click', (e) => {
-        if (e.target.classList.contains('color-option')) { colorPicker.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected')); e.target.classList.add('selected'); }
+        if (e.target.classList.contains('color-option')) { 
+            colorPicker.querySelectorAll('.color-option').forEach(opt => opt.classList.remove('selected')); 
+            e.target.classList.add('selected'); 
+        }
     });
+    
+    // Image preview
     if (elements.tagImageInput && elements.imagePreview && elements.imagePreviewContainer) {
         elements.tagImageInput.addEventListener('input', (e) => {
             const url = e.target.value.trim();
-            if (url) { elements.imagePreview.src = url; elements.imagePreview.onload = () => elements.imagePreviewContainer.classList.remove('hidden'); elements.imagePreview.onerror = () => elements.imagePreviewContainer.classList.add('hidden'); }
-            else elements.imagePreviewContainer.classList.add('hidden');
+            if (url) { 
+                elements.imagePreview.src = url; 
+                elements.imagePreview.onload = () => elements.imagePreviewContainer.classList.remove('hidden'); 
+                elements.imagePreview.onerror = () => elements.imagePreviewContainer.classList.add('hidden'); 
+            } else {
+                elements.imagePreviewContainer.classList.add('hidden');
+            }
         });
     }
 }
 
-// Initialize workspace collaboration
+// Initialize workspace collaboration with authentication
 async function initializeWorkspaceCollaboration() {
     if (window.workspaceCollaboration) {
         const initialized = await window.workspaceCollaboration.initializeSupabase();
         if (initialized) {
-            console.log('✅ Workspace collaboration system ready');
+            console.log('✅ Workspace collaboration system ready with authentication');
+            
+            // Update UI based on initial auth state
+            updateAuthenticationUI();
         }
     }
 }
 
+// Make these functions global for external access
+window.updateAuthenticationUI = updateAuthenticationUI;
+window.showAuthRequiredModal = showAuthRequiredModal;
+window.updateCollaborationUI = updateCollaborationUI;
+
+// --- INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
     const elementIds = [
       'upload-header', 'upload-content-section', 'chevron-icon', 'universal-upload-area', 'universal-upload-input',
@@ -755,27 +1181,47 @@ document.addEventListener('DOMContentLoaded', () => {
       'view-switch-btn', 'view-switch-icon-MOBILE-ICON', 'view-switch-icon-DESKTOP-ICON',
       'desktop-search-section', 'mobile-search-section'
     ];
+    
     elementIds.forEach(id => {
         const camelCaseId = id.replace(/-([a-z])/g, (_, letter) => letter.toUpperCase());
         elements[camelCaseId] = document.getElementById(id);
     });
+    
     elements.viewSwitchIconMobilePhone = document.getElementById('view-switch-icon-MOBILE-ICON');
     elements.viewSwitchIconDesktopMonitor = document.getElementById('view-switch-icon-DESKTOP-ICON');
 
-    console.log('🏥 Hospital Room Directory - UMich Version with Workspace Collaboration Initialized');
+    console.log('🏥 Hospital Room Directory - Enhanced UMich Version with Authentication Initialized');
+    
     if (localStorage.getItem('hideWelcomeModal') === 'true') state.hideWelcomeModal = true;
     if (elements.resultsPerPage) elements.resultsPerPage.value = state.resultsPerPage.toString();
     if (elements.resultsPerPageMobile) elements.resultsPerPageMobile.value = state.resultsPerPage.toString();
 
     setupEventListeners();
-    initializeAppView(); // Direct call to ui.js function
-    showWelcomeModal();
-    updatePaginationControls(0); // Direct call to ui.js function
-    updateDataSummary();        // Direct call to ui.js function
-    updateUploadAreaState();    // Direct call to ui.js function
+    initializeAppView();
     
-    // Initialize workspace collaboration
+    // Don't show welcome modal immediately - wait for auth state
+    setTimeout(() => {
+        if (!state.hideWelcomeModal) {
+            showWelcomeModal();
+        }
+    }, 1000);
+    
+    updatePaginationControls(0);
+    updateDataSummary();
+    updateUploadAreaState();
+    
+    // Initialize workspace collaboration with authentication
     initializeWorkspaceCollaboration();
+    
+    // Show auth required modal if not authenticated after initialization
+    setTimeout(() => {
+        if (!window.workspaceCollaboration?.collaborationState?.isAuthenticated) {
+            const authRequiredModal = document.getElementById('auth-required-modal');
+            if (authRequiredModal) {
+                authRequiredModal.classList.remove('hidden');
+            }
+        }
+    }, 2000);
     
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
