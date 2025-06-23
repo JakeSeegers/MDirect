@@ -706,7 +706,6 @@ async function importSession(file) {
         state.loadedFiles.push({ name: file.name, type: 'session', status: 'processed' });
         await createSearchIndex();
         console.log(`✅ Session restored.`);
-        addError(`Session '${file.name}' loaded successfully.`);
     } catch (e) {
         addError(`Session Import Error (${file.name}): ${e.message}`);
         console.error(e);
