@@ -3,7 +3,7 @@
 
 // ✅ SAFE: Only public keys in client-side code
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6Y3Fzb3Jmb2J5Z3lkeGtkbXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNDU2NTYsImV4cCI6MjA2NDYyMTY1Nn0.YOUR_ANON_KEY_HERE';
+const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6Y3Fzb3Jmb2J5Z3lkeGtkbXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNDU2NTYsImV4cCI6MjA2NDYyMTY1Nn0.RQbH081Tvn8_r_G-_mIT2ADANo3PLnCI6ifOIoOESXY';
 
 let supabaseClient = null;
 
