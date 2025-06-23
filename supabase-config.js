@@ -2,7 +2,7 @@
 
 // 🔧 REPLACE THESE WITH YOUR ACTUAL VALUES
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'YOUR_ACTUAL_ANON_KEY_HERE'; // Replace with your anon key
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_kfF8UkBRp7jaZMJCXTpUgQ_-TXYv4lq'; // Replace with your anon key
 
 let supabaseClient = null;
 
