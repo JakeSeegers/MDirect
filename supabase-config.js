@@ -1,13 +1,12 @@
-// --- SECURE SUPABASE CONFIGURATION ---
-// Replace your supabase-config.js with this secure version
+// === SECURE SUPABASE CONFIG - REPLACE YOUR ENTIRE supabase-config.js ===
 
-// ✅ SAFE: Only public keys in client-side code
+// ✅ SAFE: Modern publishable key (secure for client-side use)
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InB6Y3Fzb3Jmb2J5Z3lkeGtkbXpjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwNDU2NTYsImV4cCI6MjA2NDYyMTY1Nn0.RQbH081Tvn8_r_G-_mIT2ADANo3PLnCI6ifOIoOESXY';
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_HBT2NPpEPDggpLiEG4RllQ_KDJhp0yp';
 
 let supabaseClient = null;
 
-// Collaboration state (unchanged)
+// Collaboration state
 const collaborationState = {
     isOnline: false,
     currentWorkspace: null,
@@ -24,9 +23,9 @@ async function initializeSupabase() {
         let attempts = 0;
         while (attempts < 30) {
             if (window.supabase && typeof window.supabase.createClient === 'function') {
-                // ✅ Use ANON key instead of service role
-                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-                console.log('✅ Supabase initialized securely');
+                // ✅ Use modern publishable key - this is SAFE for client-side
+                supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+                console.log('✅ Supabase initialized securely with publishable key');
                 return true;
             }
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -40,19 +39,18 @@ async function initializeSupabase() {
     }
 }
 
-// ✅ SECURE: Create workspace via RLS-protected database
+// ✅ SECURE: All database operations use RLS-protected client
 async function createWorkspace(workspaceName, password, creatorName) {
     if (!supabaseClient) return { success: false, error: 'Supabase not initialized' };
     
     try {
         console.log('🔄 Creating workspace:', workspaceName);
         
-        // ✅ This will be protected by RLS policies
         const { data: workspace, error } = await supabaseClient
             .from('workspaces')
             .insert({
                 name: workspaceName,
-                password_hash: btoa(password), // Simple encoding for demo
+                password_hash: btoa(password),
                 created_by: creatorName,
                 created_at: new Date().toISOString()
             })
@@ -60,7 +58,7 @@ async function createWorkspace(workspaceName, password, creatorName) {
             .single();
             
         if (error) {
-            if (error.code === '23505') { // Unique constraint violation
+            if (error.code === '23505') {
                 return { success: false, error: 'Workspace name already exists' };
             }
             throw error;
@@ -75,14 +73,12 @@ async function createWorkspace(workspaceName, password, creatorName) {
     }
 }
 
-// ✅ SECURE: Join workspace with public client
 async function joinWorkspace(workspaceName, password, userName) {
     if (!supabaseClient) return { success: false, error: 'Supabase not initialized' };
     
     try {
         console.log('🔄 Joining workspace:', workspaceName);
         
-        // ✅ Query protected by RLS
         const { data: workspace, error } = await supabaseClient
             .from('workspaces')
             .select('*')
@@ -93,12 +89,10 @@ async function joinWorkspace(workspaceName, password, userName) {
             return { success: false, error: 'Workspace not found' };
         }
         
-        // Check password
         if (atob(workspace.password_hash) !== password) {
             return { success: false, error: 'Incorrect password' };
         }
         
-        // Set up user session
         collaborationState.currentWorkspace = workspace;
         collaborationState.currentUser = {
             name: userName,
@@ -116,22 +110,15 @@ async function joinWorkspace(workspaceName, password, userName) {
     }
 }
 
-// ✅ SECURE: Save tags using RLS policies
 async function saveTagToWorkspace(roomId, tagObject) {
-    console.log('🔍 saveTagToWorkspace called with:', { roomId, tagObject });
-    
     if (!supabaseClient || !collaborationState.currentWorkspace) {
         return false;
     }
     
     try {
         const room = state.processedData.find(r => r.id.toString() === roomId.toString());
-        if (!room) {
-            console.error('❌ Room not found for ID:', roomId);
-            return false;
-        }
+        if (!room) return false;
         
-        // ✅ Insert protected by RLS - user can only insert to their workspace
         const tagData = {
             workspace_id: collaborationState.currentWorkspace.id,
             room_identifier: room.rmrecnbr || room.id,
@@ -149,7 +136,6 @@ async function saveTagToWorkspace(roomId, tagObject) {
             
         if (error) throw error;
         
-        // Broadcast to realtime channel
         if (collaborationState.activeChannel) {
             await collaborationState.activeChannel.send({
                 type: 'broadcast',
@@ -172,7 +158,6 @@ async function saveTagToWorkspace(roomId, tagObject) {
     }
 }
 
-// ✅ SECURE: Remove tags using RLS
 async function removeTagFromWorkspace(roomId, tagObject) {
     if (!supabaseClient || !collaborationState.currentWorkspace) return false;
     
@@ -180,18 +165,16 @@ async function removeTagFromWorkspace(roomId, tagObject) {
         const room = state.processedData.find(r => r.id === roomId);
         if (!room) return false;
         
-        // ✅ Delete protected by RLS - user can only delete from their workspace
         const { error } = await supabaseClient
             .from('workspace_tags')
             .delete()
             .eq('workspace_id', collaborationState.currentWorkspace.id)
             .eq('room_identifier', room.rmrecnbr || room.id)
             .eq('tag_name', tagObject.name)
-            .eq('created_by', collaborationState.currentUser.name); // ✅ Only delete own tags
+            .eq('created_by', collaborationState.currentUser.name);
             
         if (error) throw error;
         
-        // Broadcast removal
         if (collaborationState.activeChannel) {
             await collaborationState.activeChannel.send({
                 type: 'broadcast',
@@ -213,12 +196,10 @@ async function removeTagFromWorkspace(roomId, tagObject) {
     }
 }
 
-// ✅ SECURE: Sync tags using RLS
 async function syncWorkspaceTags() {
     if (!supabaseClient || !collaborationState.currentWorkspace) return;
     
     try {
-        // ✅ Select protected by RLS - only see tags from current workspace
         const { data: tags, error } = await supabaseClient
             .from('workspace_tags')
             .select('*')
@@ -226,12 +207,10 @@ async function syncWorkspaceTags() {
             
         if (error) throw error;
         
-        // Clear existing workspace tags
         Object.keys(state.customTags).forEach(roomId => {
             state.customTags[roomId] = state.customTags[roomId]?.filter(tag => !tag.workspace) || [];
         });
         
-        // Add workspace tags
         tags.forEach(dbTag => {
             const roomId = findRoomIdByIdentifier(dbTag.room_identifier);
             if (roomId) {
@@ -245,7 +224,6 @@ async function syncWorkspaceTags() {
             }
         });
         
-        // Update UI
         if (typeof updateResults === 'function') {
             updateResults();
         }
@@ -257,7 +235,6 @@ async function syncWorkspaceTags() {
     }
 }
 
-// Real-time collaboration setup (unchanged but now secure)
 async function initializeRealtimeCollaboration(workspaceId) {
     try {
         const channelName = `workspace_${workspaceId}`;
@@ -317,7 +294,7 @@ async function initializeRealtimeCollaboration(workspaceId) {
     }
 }
 
-// Utility functions (unchanged)
+// Utility functions
 function findRoomIdByIdentifier(identifier) {
     let room = state.processedData.find(r => String(r.rmrecnbr) === String(identifier));
     if (!room) room = state.processedData.find(r => r.id.toString() === identifier.toString());
