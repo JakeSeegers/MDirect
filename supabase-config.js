@@ -1,50 +1,47 @@
-// === UPDATED SUPABASE CONFIG WITH AUTHENTICATION ===
+// === CLEAN SUPABASE CONFIG - NO SYNTAX ERRORS ===
 
 // 🔧 REPLACE THESE WITH YOUR ACTUAL VALUES
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
-const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_kfF8UkBRp7jaZMJCXTpUgQ_-TXYv4lq'; // Replace with your anon key
+const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_HBT2NPpEPDggpLiEG4RllQ_KDJhp0yp';
 
 let supabaseClient = null;
 
-// Enhanced collaboration state with authentication
+// Collaboration state
 const collaborationState = {
+    isAuthenticated: false,
     isOnline: false,
     currentWorkspace: null,
     currentUser: null,
-    userProfile: null,
     connectedUsers: new Map(),
-    activeChannel: null,
-    isAuthenticated: false
+    activeChannel: null
 };
 
-// ✅ Initialize Supabase with authentication
+// Initialize Supabase
 async function initializeSupabase() {
     try {
-        console.log('🔄 Initializing Supabase with authentication...');
+        console.log('🔄 Initializing Supabase...');
         
         let attempts = 0;
         while (attempts < 30) {
             if (window.supabase && typeof window.supabase.createClient === 'function') {
                 supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
                 
-                // Set up auth state listener
+                // Check for existing session
+                const { data: { session } } = await supabaseClient.auth.getSession();
+                if (session) {
+                    await handleAuthSuccess(session.user);
+                }
+                
+                // Listen for auth changes
                 supabaseClient.auth.onAuthStateChange(async (event, session) => {
-                    console.log('🔐 Auth state changed:', event, session?.user?.email);
-                    
                     if (event === 'SIGNED_IN' && session) {
-                        await handleUserSignIn(session.user);
+                        await handleAuthSuccess(session.user);
                     } else if (event === 'SIGNED_OUT') {
-                        handleUserSignOut();
+                        handleAuthSignOut();
                     }
                 });
                 
-                // Check if user is already signed in
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    await handleUserSignIn(session.user);
-                }
-                
-                console.log('✅ Supabase initialized with authentication');
+                console.log('✅ Supabase initialized securely');
                 return true;
             }
             await new Promise(resolve => setTimeout(resolve, 100));
@@ -58,91 +55,87 @@ async function initializeSupabase() {
     }
 }
 
-// Handle user sign in
-async function handleUserSignIn(user) {
-    console.log('👤 User signed in:', user.email);
+// Handle successful authentication
+async function handleAuthSuccess(user) {
+    console.log('✅ User authenticated:', user.email);
     
     // Check if email is from umich.edu
-    if (!isUMichEmail(user.email)) {
+    if (!user.email.endsWith('@umich.edu') && !user.email.endsWith('@med.umich.edu')) {
         console.warn('⚠️ Non-UMich email detected:', user.email);
-        await supabaseClient.auth.signOut();
-        alert('Please use your University of Michigan email address (@umich.edu or @med.umich.edu)');
+        alert('Please use your University of Michigan email address (@umich.edu)');
+        await signOut();
         return;
     }
     
-    collaborationState.currentUser = user;
     collaborationState.isAuthenticated = true;
+    collaborationState.currentUser = user;
     
-    // Get or create user profile
-    await getOrCreateUserProfile(user);
+    // Create/update user profile
+    await createOrUpdateUserProfile(user);
     
     // Update UI
-    if (typeof updateAuthenticationUI === 'function') {
-        updateAuthenticationUI();
+    if (typeof window.updateAuthenticationUI === 'function') {
+        window.updateAuthenticationUI();
     }
+    
+    // Hide auth modal
+    const authModal = document.getElementById('auth-required-modal');
+    if (authModal) {
+        authModal.classList.add('hidden');
+    }
+    
+    console.log('🎉 Authentication complete for:', user.email);
 }
 
-// Handle user sign out
-function handleUserSignOut() {
+// Handle sign out
+function handleAuthSignOut() {
     console.log('👋 User signed out');
     
-    // Leave any active workspace
-    if (collaborationState.isOnline) {
-        leaveWorkspace();
-    }
-    
-    // Clear state
-    collaborationState.currentUser = null;
-    collaborationState.userProfile = null;
     collaborationState.isAuthenticated = false;
+    collaborationState.currentUser = null;
+    collaborationState.isOnline = false;
+    collaborationState.currentWorkspace = null;
+    
+    // Clean up realtime connections
+    if (collaborationState.activeChannel) {
+        collaborationState.activeChannel.unsubscribe();
+        collaborationState.activeChannel = null;
+    }
     
     // Update UI
-    if (typeof updateAuthenticationUI === 'function') {
-        updateAuthenticationUI();
+    if (typeof window.updateAuthenticationUI === 'function') {
+        window.updateAuthenticationUI();
+    }
+    
+    // Show auth modal
+    const authModal = document.getElementById('auth-required-modal');
+    if (authModal) {
+        authModal.classList.remove('hidden');
     }
 }
 
-// Get or create user profile
-async function getOrCreateUserProfile(user) {
+// Create or update user profile
+async function createOrUpdateUserProfile(user) {
     try {
-        const { data: profile, error } = await supabaseClient
+        const { data, error } = await supabaseClient
             .from('user_profiles')
-            .select('*')
-            .eq('id', user.id)
-            .single();
+            .upsert({
+                id: user.id,
+                email: user.email,
+                full_name: user.user_metadata?.full_name || user.email,
+                avatar_url: user.user_metadata?.avatar_url,
+                updated_at: new Date().toISOString()
+            })
+            .select();
             
-        if (error && error.code !== 'PGRST116') { // Not found error
-            throw error;
-        }
-        
-        if (profile) {
-            collaborationState.userProfile = profile;
-            console.log('✅ User profile loaded:', profile.full_name);
+        if (error) {
+            console.error('❌ Error creating user profile:', error);
         } else {
-            // Profile doesn't exist, it should be created by the database trigger
-            console.log('⏳ Waiting for user profile creation...');
-            
-            // Wait a moment for the trigger to create the profile
-            await new Promise(resolve => setTimeout(resolve, 1000));
-            
-            // Try again
-            const { data: newProfile } = await supabaseClient
-                .from('user_profiles')
-                .select('*')
-                .eq('id', user.id)
-                .single();
-                
-            collaborationState.userProfile = newProfile;
-            console.log('✅ User profile created:', newProfile?.full_name);
+            console.log('✅ User profile updated');
         }
     } catch (error) {
-        console.error('❌ Error handling user profile:', error);
+        console.error('❌ Profile update error:', error);
     }
-}
-
-// Check if email is from UMich
-function isUMichEmail(email) {
-    return email.endsWith('@umich.edu') || email.endsWith('@med.umich.edu');
 }
 
 // Sign in with Google
@@ -158,7 +151,7 @@ async function signInWithGoogle() {
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: https://github.com/JakeSeegers/MDirect/
+                redirectTo: 'https://jakeseegers.github.io/MDirect/'
             }
         });
         
@@ -181,16 +174,17 @@ async function signOut() {
         const { error } = await supabaseClient.auth.signOut();
         if (error) throw error;
         
-        console.log('✅ Signed out successfully');
+        console.log('✅ Sign out successful');
+        return { success: true };
         
     } catch (error) {
         console.error('❌ Sign out error:', error);
+        return { success: false, error: error.message };
     }
 }
 
-// Enhanced workspace functions with authentication
-
-async function createWorkspace(workspaceName, description = '') {
+// Create workspace
+async function createWorkspace(workspaceName, description, creatorName) {
     if (!supabaseClient || !collaborationState.isAuthenticated) {
         return { success: false, error: 'Not authenticated' };
     }
@@ -202,7 +196,7 @@ async function createWorkspace(workspaceName, description = '') {
             .from('workspaces')
             .insert({
                 name: workspaceName,
-                description: description,
+                description: description || '',
                 created_by: collaborationState.currentUser.id,
                 settings: {}
             })
@@ -217,13 +211,15 @@ async function createWorkspace(workspaceName, description = '') {
         }
         
         // Add creator as owner
-        await supabaseClient
+        const { error: memberError } = await supabaseClient
             .from('workspace_members')
             .insert({
                 workspace_id: workspace.id,
                 user_id: collaborationState.currentUser.id,
                 role: 'owner'
             });
+            
+        if (memberError) throw memberError;
         
         console.log('✅ Workspace created:', workspaceName);
         return { success: true, workspace };
@@ -234,6 +230,7 @@ async function createWorkspace(workspaceName, description = '') {
     }
 }
 
+// Join workspace
 async function joinWorkspace(workspaceName) {
     if (!supabaseClient || !collaborationState.isAuthenticated) {
         return { success: false, error: 'Not authenticated' };
@@ -242,14 +239,13 @@ async function joinWorkspace(workspaceName) {
     try {
         console.log('🔄 Joining workspace:', workspaceName);
         
-        // Find workspace
-        const { data: workspace, error: workspaceError } = await supabaseClient
+        const { data: workspace, error } = await supabaseClient
             .from('workspaces')
             .select('*')
             .eq('name', workspaceName)
             .single();
             
-        if (workspaceError || !workspace) {
+        if (error || !workspace) {
             return { success: false, error: 'Workspace not found' };
         }
         
@@ -263,17 +259,18 @@ async function joinWorkspace(workspaceName) {
             
         if (!existingMember) {
             // Add as member
-            await supabaseClient
+            const { error: memberError } = await supabaseClient
                 .from('workspace_members')
                 .insert({
                     workspace_id: workspace.id,
                     user_id: collaborationState.currentUser.id,
                     role: 'member'
                 });
+                
+            if (memberError) throw memberError;
         }
         
         collaborationState.currentWorkspace = workspace;
-        
         await initializeRealtimeCollaboration(workspace.id);
         
         console.log('✅ Joined workspace:', workspaceName);
@@ -285,6 +282,7 @@ async function joinWorkspace(workspaceName) {
     }
 }
 
+// Save tag to workspace
 async function saveTagToWorkspace(roomId, tagObject) {
     if (!supabaseClient || !collaborationState.currentWorkspace || !collaborationState.isAuthenticated) {
         return false;
@@ -296,11 +294,11 @@ async function saveTagToWorkspace(roomId, tagObject) {
         
         const tagData = {
             workspace_id: collaborationState.currentWorkspace.id,
-            created_by: collaborationState.currentUser.id,
             room_identifier: room.rmrecnbr || room.id,
             tag_name: tagObject.name,
             tag_type: tagObject.type || 'simple',
-            tag_data: JSON.stringify(tagObject)
+            tag_data: JSON.stringify(tagObject),
+            created_by: collaborationState.currentUser.id
         };
         
         const { data, error } = await supabaseClient
@@ -310,27 +308,7 @@ async function saveTagToWorkspace(roomId, tagObject) {
             
         if (error) throw error;
         
-        // Log activity
-        await supabaseClient.rpc('log_user_activity', {
-            p_workspace_id: collaborationState.currentWorkspace.id,
-            p_action: 'tag_created',
-            p_details: { tag_name: tagObject.name, room_id: roomId }
-        });
-        
-        if (collaborationState.activeChannel) {
-            await collaborationState.activeChannel.send({
-                type: 'broadcast',
-                event: 'tag_added',
-                payload: {
-                    room_id: roomId,
-                    tag: tagObject,
-                    user: collaborationState.userProfile?.full_name || collaborationState.currentUser.email,
-                    timestamp: new Date().toISOString()
-                }
-            });
-        }
-        
-        console.log('✅ Tag saved securely:', tagObject.name);
+        console.log('✅ Tag saved to workspace:', tagObject.name);
         return true;
         
     } catch (error) {
@@ -339,6 +317,7 @@ async function saveTagToWorkspace(roomId, tagObject) {
     }
 }
 
+// Remove tag from workspace
 async function removeTagFromWorkspace(roomId, tagObject) {
     if (!supabaseClient || !collaborationState.currentWorkspace || !collaborationState.isAuthenticated) {
         return false;
@@ -358,26 +337,7 @@ async function removeTagFromWorkspace(roomId, tagObject) {
             
         if (error) throw error;
         
-        // Log activity
-        await supabaseClient.rpc('log_user_activity', {
-            p_workspace_id: collaborationState.currentWorkspace.id,
-            p_action: 'tag_deleted',
-            p_details: { tag_name: tagObject.name, room_id: roomId }
-        });
-        
-        if (collaborationState.activeChannel) {
-            await collaborationState.activeChannel.send({
-                type: 'broadcast',
-                event: 'tag_removed',
-                payload: {
-                    room_id: roomId,
-                    tag_name: tagObject.name,
-                    user: collaborationState.userProfile?.full_name || collaborationState.currentUser.email
-                }
-            });
-        }
-        
-        console.log('✅ Tag removed securely:', tagObject.name);
+        console.log('✅ Tag removed from workspace:', tagObject.name);
         return true;
         
     } catch (error) {
@@ -386,16 +346,44 @@ async function removeTagFromWorkspace(roomId, tagObject) {
     }
 }
 
+// Initialize realtime collaboration
+async function initializeRealtimeCollaboration(workspaceId) {
+    try {
+        const channelName = `workspace_${workspaceId}`;
+        collaborationState.activeChannel = supabaseClient.channel(channelName);
+        
+        collaborationState.activeChannel
+            .on('postgres_changes', {
+                event: '*',
+                schema: 'public',
+                table: 'workspace_tags',
+                filter: `workspace_id=eq.${workspaceId}`
+            }, (payload) => {
+                console.log('📡 Workspace tag changed:', payload);
+                syncWorkspaceTags();
+            });
+        
+        await collaborationState.activeChannel.subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                collaborationState.isOnline = true;
+                console.log('✅ Real-time collaboration active');
+                syncWorkspaceTags();
+            }
+        });
+        
+    } catch (error) {
+        console.error('❌ Real-time collaboration error:', error);
+    }
+}
+
+// Sync workspace tags
 async function syncWorkspaceTags() {
     if (!supabaseClient || !collaborationState.currentWorkspace) return;
     
     try {
         const { data: tags, error } = await supabaseClient
             .from('workspace_tags')
-            .select(`
-                *,
-                created_by_profile:user_profiles!workspace_tags_created_by_fkey(full_name)
-            `)
+            .select('*')
             .eq('workspace_id', collaborationState.currentWorkspace.id);
             
         if (error) throw error;
@@ -413,13 +401,13 @@ async function syncWorkspaceTags() {
                 
                 const tagObject = JSON.parse(dbTag.tag_data);
                 tagObject.workspace = true;
-                tagObject.created_by = dbTag.created_by_profile?.full_name || 'Team member';
-                tagObject.workspace_tag_id = dbTag.id;
+                tagObject.created_by = dbTag.created_by;
                 
                 state.customTags[roomId].push(tagObject);
             }
         });
         
+        // Update UI
         if (typeof updateResults === 'function') {
             updateResults();
         }
@@ -431,66 +419,7 @@ async function syncWorkspaceTags() {
     }
 }
 
-async function initializeRealtimeCollaboration(workspaceId) {
-    try {
-        const channelName = `workspace_${workspaceId}`;
-        collaborationState.activeChannel = supabaseClient.channel(channelName);
-        
-        collaborationState.activeChannel
-            .on('presence', { event: 'sync' }, () => {
-                const presenceState = collaborationState.activeChannel.presenceState();
-                updateOnlineUsers(presenceState);
-            })
-            .on('presence', { event: 'join' }, ({ newPresences }) => {
-                console.log('👥 User joined workspace:', newPresences);
-                updateOnlineUsers(collaborationState.activeChannel.presenceState());
-                showNotification(`${newPresences[0]?.user_name || 'Someone'} joined the workspace`);
-            })
-            .on('presence', { event: 'leave' }, ({ leftPresences }) => {
-                console.log('👋 User left workspace:', leftPresences);
-                updateOnlineUsers(collaborationState.activeChannel.presenceState());
-                showNotification(`${leftPresences[0]?.user_name || 'Someone'} left the workspace`);
-            })
-            .on('broadcast', { event: 'tag_added' }, (payload) => {
-                handleRemoteTagUpdate(payload);
-            })
-            .on('broadcast', { event: 'tag_removed' }, (payload) => {
-                handleRemoteTagRemoval(payload);
-            })
-            .on('postgres_changes', {
-                event: '*',
-                schema: 'public',
-                table: 'workspace_tags',
-                filter: `workspace_id=eq.${workspaceId}`
-            }, (payload) => {
-                syncWorkspaceTags();
-            });
-        
-        await collaborationState.activeChannel.subscribe(async (status) => {
-            if (status === 'SUBSCRIBED') {
-                await collaborationState.activeChannel.track({
-                    user_name: collaborationState.userProfile?.full_name || collaborationState.currentUser.email,
-                    joined_at: new Date().toISOString()
-                });
-                
-                collaborationState.isOnline = true;
-                
-                if (typeof updateCollaborationUI === 'function') {
-                    updateCollaborationUI();
-                }
-                
-                await syncWorkspaceTags();
-                console.log('✅ Real-time collaboration active');
-                showNotification('✅ Connected to workspace!');
-            }
-        });
-        
-    } catch (error) {
-        console.error('❌ Real-time collaboration error:', error);
-    }
-}
-
-// Utility functions
+// Helper function to find room by identifier
 function findRoomIdByIdentifier(identifier) {
     let room = state.processedData.find(r => String(r.rmrecnbr) === String(identifier));
     if (!room) room = state.processedData.find(r => r.id.toString() === identifier.toString());
@@ -498,64 +427,13 @@ function findRoomIdByIdentifier(identifier) {
     return room ? room.id : null;
 }
 
-function updateOnlineUsers(presenceState) {
-    collaborationState.connectedUsers.clear();
-    
-    Object.values(presenceState).forEach(presenceList => {
-        presenceList.forEach(presence => {
-            collaborationState.connectedUsers.set(presence.user_name, presence);
-        });
-    });
-    
-    if (typeof updateCollaborationUI === 'function') {
-        updateCollaborationUI();
-    }
-}
-
-function handleRemoteTagUpdate(payload) {
-    const currentUserName = collaborationState.userProfile?.full_name || collaborationState.currentUser?.email;
-    if (payload.payload?.user === currentUserName) return;
-    
-    showNotification(`${payload.payload?.user} added tag "${payload.payload?.tag?.name}"`);
-    syncWorkspaceTags();
-}
-
-function handleRemoteTagRemoval(payload) {
-    const currentUserName = collaborationState.userProfile?.full_name || collaborationState.currentUser?.email;
-    if (payload.payload?.user === currentUserName) return;
-    
-    showNotification(`${payload.payload?.user} removed tag "${payload.payload?.tag_name}"`);
-    syncWorkspaceTags();
-}
-
-function showNotification(message) {
-    const notification = document.createElement('div');
-    notification.className = 'fixed top-16 right-4 bg-blue-100 border border-blue-300 text-blue-800 px-4 py-2 rounded-lg shadow-lg z-50 animate-fade-in';
-    notification.innerHTML = `
-        <div class="flex items-center gap-2">
-            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                <path d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z"/>
-            </svg>
-            <span class="text-sm">${sanitizeHTML(message)}</span>
-        </div>
-    `;
-    document.body.appendChild(notification);
-    setTimeout(() => {
-        notification.style.opacity = '0';
-        setTimeout(() => {
-            if (document.body.contains(notification)) {
-                document.body.removeChild(notification);
-            }
-        }, 300);
-    }, 4000);
-}
-
+// Leave workspace
 function leaveWorkspace() {
     if (collaborationState.activeChannel) {
         collaborationState.activeChannel.unsubscribe();
     }
     
-    // Clear workspace tags from local state
+    // Clear workspace tags
     Object.keys(state.customTags).forEach(roomId => {
         state.customTags[roomId] = state.customTags[roomId]?.filter(tag => !tag.workspace) || [];
     });
@@ -564,6 +442,7 @@ function leaveWorkspace() {
     collaborationState.currentWorkspace = null;
     collaborationState.connectedUsers.clear();
     
+    // Update UI
     if (typeof updateCollaborationUI === 'function') {
         updateCollaborationUI();
     }
@@ -572,30 +451,32 @@ function leaveWorkspace() {
         updateResults();
     }
     
-    showNotification('📡 Disconnected from workspace');
+    console.log('📡 Left workspace');
 }
 
-function sanitizeHTML(text) {
-    const temp = document.createElement('div');
-    temp.textContent = text || '';
-    return temp.innerHTML;
-}
-
-// Export functions - Make sure they're available globally
+// Export everything properly
 window.workspaceCollaboration = {
+    // State
+    collaborationState,
+    
+    // Authentication
     initializeSupabase,
     signInWithGoogle,
     signOut,
+    
+    // Workspace management
     createWorkspace,
     joinWorkspace,
+    leaveWorkspace,
+    
+    // Tag management
     saveTagToWorkspace,
     removeTagFromWorkspace,
     syncWorkspaceTags,
-    leaveWorkspace,
-    collaborationState,
-    supabaseClient // Export this too for profile functions
+    
+    // Realtime
+    initializeRealtimeCollaboration,
+    
+    // Direct access to supabase client for debugging
+    get supabaseClient() { return supabaseClient; }
 };
-
-// Also make individual functions available for debugging
-window.signInWithGoogle = signInWithGoogle;
-window.signOut = signOut;
