@@ -1,6 +1,6 @@
-// === CLEAN SUPABASE CONFIG - NO SYNTAX ERRORS ===
+// === SIMPLE SUPABASE CONFIG - NO SYNTAX ERRORS ===
 
-// 🔧 REPLACE THESE WITH YOUR ACTUAL VALUES
+// Your actual Supabase values
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_HBT2NPpEPDggpLiEG4RllQ_KDJhp0yp';
 
@@ -27,9 +27,9 @@ async function initializeSupabase() {
                 supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
                 
                 // Check for existing session
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    await handleAuthSuccess(session.user);
+                const session = await supabaseClient.auth.getSession();
+                if (session.data && session.data.session) {
+                    await handleAuthSuccess(session.data.session.user);
                 }
                 
                 // Listen for auth changes
@@ -117,15 +117,17 @@ function handleAuthSignOut() {
 // Create or update user profile
 async function createOrUpdateUserProfile(user) {
     try {
+        const profileData = {
+            id: user.id,
+            email: user.email,
+            full_name: user.user_metadata && user.user_metadata.full_name ? user.user_metadata.full_name : user.email,
+            avatar_url: user.user_metadata && user.user_metadata.avatar_url ? user.user_metadata.avatar_url : null,
+            updated_at: new Date().toISOString()
+        };
+        
         const { data, error } = await supabaseClient
             .from('user_profiles')
-            .upsert({
-                id: user.id,
-                email: user.email,
-                full_name: user.user_metadata?.full_name || user.email,
-                avatar_url: user.user_metadata?.avatar_url,
-                updated_at: new Date().toISOString()
-            })
+            .upsert(profileData)
             .select();
             
         if (error) {
@@ -349,7 +351,7 @@ async function removeTagFromWorkspace(roomId, tagObject) {
 // Initialize realtime collaboration
 async function initializeRealtimeCollaboration(workspaceId) {
     try {
-        const channelName = `workspace_${workspaceId}`;
+        const channelName = 'workspace_' + workspaceId;
         collaborationState.activeChannel = supabaseClient.channel(channelName);
         
         collaborationState.activeChannel
@@ -357,7 +359,7 @@ async function initializeRealtimeCollaboration(workspaceId) {
                 event: '*',
                 schema: 'public',
                 table: 'workspace_tags',
-                filter: `workspace_id=eq.${workspaceId}`
+                filter: 'workspace_id=eq.' + workspaceId
             }, (payload) => {
                 console.log('📡 Workspace tag changed:', payload);
                 syncWorkspaceTags();
@@ -390,7 +392,7 @@ async function syncWorkspaceTags() {
         
         // Clear existing workspace tags
         Object.keys(state.customTags).forEach(roomId => {
-            state.customTags[roomId] = state.customTags[roomId]?.filter(tag => !tag.workspace) || [];
+            state.customTags[roomId] = state.customTags[roomId] ? state.customTags[roomId].filter(tag => !tag.workspace) : [];
         });
         
         // Add workspace tags
@@ -412,7 +414,7 @@ async function syncWorkspaceTags() {
             updateResults();
         }
         
-        console.log(`✅ Synced ${tags.length} workspace tags`);
+        console.log('✅ Synced workspace tags:', tags.length);
         
     } catch (error) {
         console.error('❌ Error syncing workspace tags:', error);
@@ -435,7 +437,7 @@ function leaveWorkspace() {
     
     // Clear workspace tags
     Object.keys(state.customTags).forEach(roomId => {
-        state.customTags[roomId] = state.customTags[roomId]?.filter(tag => !tag.workspace) || [];
+        state.customTags[roomId] = state.customTags[roomId] ? state.customTags[roomId].filter(tag => !tag.workspace) : [];
     });
     
     collaborationState.isOnline = false;
@@ -454,29 +456,24 @@ function leaveWorkspace() {
     console.log('📡 Left workspace');
 }
 
-// Export everything properly
+// Simple function to get supabase client
+function getSupabaseClient() {
+    return supabaseClient;
+}
+
+// Export everything properly - NO GETTER SYNTAX
 window.workspaceCollaboration = {
-    // State
-    collaborationState,
-    
-    // Authentication
-    initializeSupabase,
-    signInWithGoogle,
-    signOut,
-    
-    // Workspace management
-    createWorkspace,
-    joinWorkspace,
-    leaveWorkspace,
-    
-    // Tag management
-    saveTagToWorkspace,
-    removeTagFromWorkspace,
-    syncWorkspaceTags,
-    
-    // Realtime
-    initializeRealtimeCollaboration,
-    
-    // Direct access to supabase client for debugging
-    get supabaseClient() { return supabaseClient; }
+    collaborationState: collaborationState,
+    initializeSupabase: initializeSupabase,
+    signInWithGoogle: signInWithGoogle,
+    signOut: signOut,
+    createWorkspace: createWorkspace,
+    joinWorkspace: joinWorkspace,
+    leaveWorkspace: leaveWorkspace,
+    saveTagToWorkspace: saveTagToWorkspace,
+    removeTagFromWorkspace: removeTagFromWorkspace,
+    syncWorkspaceTags: syncWorkspaceTags,
+    initializeRealtimeCollaboration: initializeRealtimeCollaboration,
+    supabaseClient: supabaseClient,
+    getSupabaseClient: getSupabaseClient
 };
