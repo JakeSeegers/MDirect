@@ -118,16 +118,19 @@ function handleAuthSignOut() {
 async function createOrUpdateUserProfile(user) {
     try {
         const profileData = {
-            id: user.id,
+            id: user.id, // This is the ID we're checking
             email: user.email,
             full_name: user.user_metadata && user.user_metadata.full_name ? user.user_metadata.full_name : user.email,
             avatar_url: user.user_metadata && user.user_metadata.avatar_url ? user.user_metadata.avatar_url : null,
             updated_at: new Date().toISOString()
         };
 
+        // ADDED FOR DEBUGGING: Log the ID being sent
+        console.log('Attempting to upsert profile for ID:', profileData.id);
+
         const { data, error } = await supabaseClient
             .from('user_profiles')
-            .upsert(profileData); // <-- REMOVED .select() HERE
+            .upsert(profileData);
 
         if (error) {
             console.error('❌ Error creating user profile:', error);
@@ -472,7 +475,7 @@ window.workspaceCollaboration = {
     removeTagFromWorkspace: removeTagFromWorkspace,
     syncWorkspaceTags: syncWorkspaceTags,
     initializeRealtimeCollaboration: initializeRealtimeCollaboration,
-    leaveWorkspace: leaveWorkspace, // Added this as it was missing from the export
+    leaveWorkspace: leaveWorkspace,
     supabaseClient: supabaseClient,
     getSupabaseClient: getSupabaseClient
 };
