@@ -20,18 +20,18 @@ const collaborationState = {
 async function initializeSupabase() {
     try {
         console.log('🔄 Initializing Supabase...');
-        
+
         let attempts = 0;
         while (attempts < 30) {
             if (window.supabase && typeof window.supabase.createClient === 'function') {
                 supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-                
+
                 // Check for existing session
                 const session = await supabaseClient.auth.getSession();
                 if (session.data && session.data.session) {
                     await handleAuthSuccess(session.data.session.user);
                 }
-                
+
                 // Listen for auth changes
                 supabaseClient.auth.onAuthStateChange(async (event, session) => {
                     if (event === 'SIGNED_IN' && session) {
@@ -40,14 +40,14 @@ async function initializeSupabase() {
                         handleAuthSignOut();
                     }
                 });
-                
+
                 console.log('✅ Supabase initialized securely');
                 return true;
             }
             await new Promise(resolve => setTimeout(resolve, 100));
             attempts++;
         }
-        
+
         throw new Error('Supabase library not available');
     } catch (error) {
         console.error('❌ Supabase initialization failed:', error);
@@ -58,7 +58,7 @@ async function initializeSupabase() {
 // Handle successful authentication
 async function handleAuthSuccess(user) {
     console.log('✅ User authenticated:', user.email);
-    
+
     // Check if email is from umich.edu
     if (!user.email.endsWith('@umich.edu') && !user.email.endsWith('@med.umich.edu')) {
         console.warn('⚠️ Non-UMich email detected:', user.email);
@@ -66,47 +66,47 @@ async function handleAuthSuccess(user) {
         await signOut();
         return;
     }
-    
+
     collaborationState.isAuthenticated = true;
     collaborationState.currentUser = user;
-    
+
     // Create/update user profile
     await createOrUpdateUserProfile(user);
-    
+
     // Update UI
     if (typeof window.updateAuthenticationUI === 'function') {
         window.updateAuthenticationUI();
     }
-    
+
     // Hide auth modal
     const authModal = document.getElementById('auth-required-modal');
     if (authModal) {
         authModal.classList.add('hidden');
     }
-    
+
     console.log('🎉 Authentication complete for:', user.email);
 }
 
 // Handle sign out
 function handleAuthSignOut() {
     console.log('👋 User signed out');
-    
+
     collaborationState.isAuthenticated = false;
     collaborationState.currentUser = null;
     collaborationState.isOnline = false;
     collaborationState.currentWorkspace = null;
-    
+
     // Clean up realtime connections
     if (collaborationState.activeChannel) {
         collaborationState.activeChannel.unsubscribe();
         collaborationState.activeChannel = null;
     }
-    
+
     // Update UI
     if (typeof window.updateAuthenticationUI === 'function') {
         window.updateAuthenticationUI();
     }
-    
+
     // Show auth modal
     const authModal = document.getElementById('auth-required-modal');
     if (authModal) {
@@ -124,12 +124,11 @@ async function createOrUpdateUserProfile(user) {
             avatar_url: user.user_metadata && user.user_metadata.avatar_url ? user.user_metadata.avatar_url : null,
             updated_at: new Date().toISOString()
         };
-        
+
         const { data, error } = await supabaseClient
             .from('user_profiles')
-            .upsert(profileData)
-            .select();
-            
+            .upsert(profileData); // <-- REMOVED .select() HERE
+
         if (error) {
             console.error('❌ Error creating user profile:', error);
         } else {
@@ -146,22 +145,22 @@ async function signInWithGoogle() {
         console.error('❌ Supabase not initialized');
         return { success: false, error: 'Supabase not initialized' };
     }
-    
+
     try {
         console.log('🔐 Initiating Google sign-in...');
-        
+
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
             options: {
                 redirectTo: 'https://jakeseegers.github.io/MDirect/'
             }
         });
-        
+
         if (error) throw error;
-        
+
         console.log('🔄 Redirecting to Google...');
         return { success: true };
-        
+
     } catch (error) {
         console.error('❌ Google sign-in error:', error);
         return { success: false, error: error.message };
@@ -171,14 +170,14 @@ async function signInWithGoogle() {
 // Sign out
 async function signOut() {
     if (!supabaseClient) return;
-    
+
     try {
         const { error } = await supabaseClient.auth.signOut();
         if (error) throw error;
-        
+
         console.log('✅ Sign out successful');
         return { success: true };
-        
+
     } catch (error) {
         console.error('❌ Sign out error:', error);
         return { success: false, error: error.message };
@@ -190,10 +189,10 @@ async function createWorkspace(workspaceName, description, creatorName) {
     if (!supabaseClient || !collaborationState.isAuthenticated) {
         return { success: false, error: 'Not authenticated' };
     }
-    
+
     try {
         console.log('🔄 Creating workspace:', workspaceName);
-        
+
         const { data: workspace, error } = await supabaseClient
             .from('workspaces')
             .insert({
@@ -204,14 +203,14 @@ async function createWorkspace(workspaceName, description, creatorName) {
             })
             .select()
             .single();
-            
+
         if (error) {
             if (error.code === '23505') {
                 return { success: false, error: 'Workspace name already exists' };
             }
             throw error;
         }
-        
+
         // Add creator as owner
         const { error: memberError } = await supabaseClient
             .from('workspace_members')
@@ -220,12 +219,12 @@ async function createWorkspace(workspaceName, description, creatorName) {
                 user_id: collaborationState.currentUser.id,
                 role: 'owner'
             });
-            
+
         if (memberError) throw memberError;
-        
+
         console.log('✅ Workspace created:', workspaceName);
         return { success: true, workspace };
-        
+
     } catch (error) {
         console.error('❌ Error creating workspace:', error);
         return { success: false, error: error.message };
@@ -237,20 +236,20 @@ async function joinWorkspace(workspaceName) {
     if (!supabaseClient || !collaborationState.isAuthenticated) {
         return { success: false, error: 'Not authenticated' };
     }
-    
+
     try {
         console.log('🔄 Joining workspace:', workspaceName);
-        
+
         const { data: workspace, error } = await supabaseClient
             .from('workspaces')
             .select('*')
             .eq('name', workspaceName)
             .single();
-            
+
         if (error || !workspace) {
             return { success: false, error: 'Workspace not found' };
         }
-        
+
         // Check if already a member
         const { data: existingMember } = await supabaseClient
             .from('workspace_members')
@@ -258,7 +257,7 @@ async function joinWorkspace(workspaceName) {
             .eq('workspace_id', workspace.id)
             .eq('user_id', collaborationState.currentUser.id)
             .single();
-            
+
         if (!existingMember) {
             // Add as member
             const { error: memberError } = await supabaseClient
@@ -268,16 +267,16 @@ async function joinWorkspace(workspaceName) {
                     user_id: collaborationState.currentUser.id,
                     role: 'member'
                 });
-                
+
             if (memberError) throw memberError;
         }
-        
+
         collaborationState.currentWorkspace = workspace;
         await initializeRealtimeCollaboration(workspace.id);
-        
+
         console.log('✅ Joined workspace:', workspaceName);
         return { success: true, workspace };
-        
+
     } catch (error) {
         console.error('❌ Error joining workspace:', error);
         return { success: false, error: error.message };
@@ -289,11 +288,11 @@ async function saveTagToWorkspace(roomId, tagObject) {
     if (!supabaseClient || !collaborationState.currentWorkspace || !collaborationState.isAuthenticated) {
         return false;
     }
-    
+
     try {
         const room = state.processedData.find(r => r.id.toString() === roomId.toString());
         if (!room) return false;
-        
+
         const tagData = {
             workspace_id: collaborationState.currentWorkspace.id,
             room_identifier: room.rmrecnbr || room.id,
@@ -302,17 +301,17 @@ async function saveTagToWorkspace(roomId, tagObject) {
             tag_data: JSON.stringify(tagObject),
             created_by: collaborationState.currentUser.id
         };
-        
+
         const { data, error } = await supabaseClient
             .from('workspace_tags')
             .insert(tagData)
             .select();
-            
+
         if (error) throw error;
-        
+
         console.log('✅ Tag saved to workspace:', tagObject.name);
         return true;
-        
+
     } catch (error) {
         console.error('❌ Error saving tag:', error);
         return false;
@@ -324,11 +323,11 @@ async function removeTagFromWorkspace(roomId, tagObject) {
     if (!supabaseClient || !collaborationState.currentWorkspace || !collaborationState.isAuthenticated) {
         return false;
     }
-    
+
     try {
         const room = state.processedData.find(r => r.id === roomId);
         if (!room) return false;
-        
+
         const { error } = await supabaseClient
             .from('workspace_tags')
             .delete()
@@ -336,12 +335,12 @@ async function removeTagFromWorkspace(roomId, tagObject) {
             .eq('room_identifier', room.rmrecnbr || room.id)
             .eq('tag_name', tagObject.name)
             .eq('created_by', collaborationState.currentUser.id);
-            
+
         if (error) throw error;
-        
+
         console.log('✅ Tag removed from workspace:', tagObject.name);
         return true;
-        
+
     } catch (error) {
         console.error('❌ Error removing tag:', error);
         return false;
@@ -353,7 +352,7 @@ async function initializeRealtimeCollaboration(workspaceId) {
     try {
         const channelName = 'workspace_' + workspaceId;
         collaborationState.activeChannel = supabaseClient.channel(channelName);
-        
+
         collaborationState.activeChannel
             .on('postgres_changes', {
                 event: '*',
@@ -364,7 +363,7 @@ async function initializeRealtimeCollaboration(workspaceId) {
                 console.log('📡 Workspace tag changed:', payload);
                 syncWorkspaceTags();
             });
-        
+
         await collaborationState.activeChannel.subscribe((status) => {
             if (status === 'SUBSCRIBED') {
                 collaborationState.isOnline = true;
@@ -372,7 +371,7 @@ async function initializeRealtimeCollaboration(workspaceId) {
                 syncWorkspaceTags();
             }
         });
-        
+
     } catch (error) {
         console.error('❌ Real-time collaboration error:', error);
     }
@@ -381,41 +380,41 @@ async function initializeRealtimeCollaboration(workspaceId) {
 // Sync workspace tags
 async function syncWorkspaceTags() {
     if (!supabaseClient || !collaborationState.currentWorkspace) return;
-    
+
     try {
         const { data: tags, error } = await supabaseClient
             .from('workspace_tags')
             .select('*')
             .eq('workspace_id', collaborationState.currentWorkspace.id);
-            
+
         if (error) throw error;
-        
+
         // Clear existing workspace tags
         Object.keys(state.customTags).forEach(roomId => {
             state.customTags[roomId] = state.customTags[roomId] ? state.customTags[roomId].filter(tag => !tag.workspace) : [];
         });
-        
+
         // Add workspace tags
         tags.forEach(dbTag => {
             const roomId = findRoomIdByIdentifier(dbTag.room_identifier);
             if (roomId) {
                 if (!state.customTags[roomId]) state.customTags[roomId] = [];
-                
+
                 const tagObject = JSON.parse(dbTag.tag_data);
                 tagObject.workspace = true;
                 tagObject.created_by = dbTag.created_by;
-                
+
                 state.customTags[roomId].push(tagObject);
             }
         });
-        
+
         // Update UI
         if (typeof updateResults === 'function') {
             updateResults();
         }
-        
+
         console.log('✅ Synced workspace tags:', tags.length);
-        
+
     } catch (error) {
         console.error('❌ Error syncing workspace tags:', error);
     }
@@ -434,25 +433,25 @@ function leaveWorkspace() {
     if (collaborationState.activeChannel) {
         collaborationState.activeChannel.unsubscribe();
     }
-    
+
     // Clear workspace tags
     Object.keys(state.customTags).forEach(roomId => {
         state.customTags[roomId] = state.customTags[roomId] ? state.customTags[roomId].filter(tag => !tag.workspace) : [];
     });
-    
+
     collaborationState.isOnline = false;
     collaborationState.currentWorkspace = null;
     collaborationState.connectedUsers.clear();
-    
+
     // Update UI
     if (typeof updateCollaborationUI === 'function') {
         updateCollaborationUI();
     }
-    
+
     if (typeof updateResults === 'function') {
         updateResults();
     }
-    
+
     console.log('📡 Left workspace');
 }
 
@@ -469,11 +468,11 @@ window.workspaceCollaboration = {
     signOut: signOut,
     createWorkspace: createWorkspace,
     joinWorkspace: joinWorkspace,
-    leaveWorkspace: leaveWorkspace,
     saveTagToWorkspace: saveTagToWorkspace,
     removeTagFromWorkspace: removeTagFromWorkspace,
     syncWorkspaceTags: syncWorkspaceTags,
     initializeRealtimeCollaboration: initializeRealtimeCollaboration,
+    leaveWorkspace: leaveWorkspace, // Added this as it was missing from the export
     supabaseClient: supabaseClient,
     getSupabaseClient: getSupabaseClient
 };
