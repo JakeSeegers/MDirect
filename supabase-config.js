@@ -1,7 +1,7 @@
 // === SIMPLE SUPABASE CONFIG - NO SYNTAX ERRORS ===
 
 // Your actual Supabase values
-const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
+const SUPABASE_URL = 'https://azguoragwmziaxwiyebb.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_HBT2NPpEPDggpLiEG4RllQ_KDJhp0yp';
 
 let supabaseClient = null;
