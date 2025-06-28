@@ -358,7 +358,7 @@ async function removeTagFromWorkspace(roomId, tagObject) {
                 
                 const confirmMessage = `⚠️ This tag was created by "${creatorName}"\n\nAre you sure you want to delete their tag "${tagObject.name}"?`;
                 
-                if (!confirm(confirmMessage)) {
+                if (!(await customConfirm(confirmMessage))) {
                     console.log('❌ Tag deletion cancelled by user');
                     return false;
                 }
