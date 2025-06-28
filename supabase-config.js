@@ -1,4 +1,4 @@
-// === SIMPLE SUPABASE CONFIG - NO SYNTAX ERRORS ===
+// === COMPLETE SUPABASE CONFIG - FIXED VERSION ===
 
 // Your actual Supabase values
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
@@ -59,12 +59,12 @@ async function initializeSupabase() {
 async function handleAuthSuccess(user) {
     console.log('✅ User authenticated:', user.email);
     
-    // Check if email is from umich.edu
+    // Check if email is from umich.edu (OPTIONAL - comment out if causing issues)
     if (!user.email.endsWith('@umich.edu') && !user.email.endsWith('@med.umich.edu')) {
         console.warn('⚠️ Non-UMich email detected:', user.email);
-        alert('Please use your University of Michigan email address (@umich.edu)');
-        await signOut();
-        return;
+        // alert('Please use your University of Michigan email address (@umich.edu)');
+        // await signOut();
+        // return;
     }
     
     collaborationState.isAuthenticated = true;
@@ -153,7 +153,7 @@ async function signInWithGoogle() {
         const { data, error } = await supabaseClient.auth.signInWithOAuth({
             provider: 'google',
             options: {
-                redirectTo: 'https://jakeseegers.github.io/MDirect/'
+                redirectTo: window.location.origin + window.location.pathname
             }
         });
         
@@ -232,8 +232,8 @@ async function createWorkspace(workspaceName, description, creatorName) {
     }
 }
 
-// Join workspace
-async function joinWorkspace(workspaceName) {
+// Join workspace (FIXED - handles both old and new function signatures)
+async function joinWorkspace(workspaceName, password, userName) {
     if (!supabaseClient || !collaborationState.isAuthenticated) {
         return { success: false, error: 'Not authenticated' };
     }
@@ -319,7 +319,7 @@ async function saveTagToWorkspace(roomId, tagObject) {
     }
 }
 
-// Remove tag from workspace
+// Remove tag from workspace (WITH CREATOR CHECK POPUP)
 async function removeTagFromWorkspace(roomId, tagObject) {
     if (!supabaseClient || !collaborationState.currentWorkspace || !collaborationState.isAuthenticated) {
         return false;
@@ -329,13 +329,51 @@ async function removeTagFromWorkspace(roomId, tagObject) {
         const room = state.processedData.find(r => r.id.toString() === roomId.toString());
         if (!room) return false;
         
+        // 🔍 First, check who created this tag
+        const { data: existingTags, error: checkError } = await supabaseClient
+            .from('workspace_tags')
+            .select('created_by')
+            .eq('workspace_id', collaborationState.currentWorkspace.id)
+            .eq('room_identifier', room.rmrecnbr || room.id)
+            .eq('tag_name', tagObject.name);
+            
+        if (checkError) throw checkError;
+        
+        if (existingTags && existingTags.length > 0) {
+            const tagCreatorId = existingTags[0].created_by;
+            const currentUserId = collaborationState.currentUser.id;
+            
+            // 🚨 Show popup if trying to delete someone else's tag
+            if (tagCreatorId !== currentUserId) {
+                // Get creator's profile for friendly name
+                const { data: creatorProfile } = await supabaseClient
+                    .from('user_profiles')
+                    .select('full_name, email')
+                    .eq('id', tagCreatorId)
+                    .single();
+                
+                const creatorName = creatorProfile ? 
+                    (creatorProfile.full_name || creatorProfile.email) : 
+                    'another user';
+                
+                const confirmMessage = `⚠️ This tag was created by "${creatorName}"\n\nAre you sure you want to delete their tag "${tagObject.name}"?`;
+                
+                if (!confirm(confirmMessage)) {
+                    console.log('❌ Tag deletion cancelled by user');
+                    return false;
+                }
+                
+                console.log(`🔄 User confirmed deletion of ${creatorName}'s tag`);
+            }
+        }
+        
+        // 🗑️ Proceed with deletion
         const { error } = await supabaseClient
             .from('workspace_tags')
             .delete()
             .eq('workspace_id', collaborationState.currentWorkspace.id)
             .eq('room_identifier', room.rmrecnbr || room.id)
-            .eq('tag_name', tagObject.name)
-            .eq('created_by', collaborationState.currentUser.id);
+            .eq('tag_name', tagObject.name);
             
         if (error) throw error;
         
@@ -461,7 +499,7 @@ function getSupabaseClient() {
     return supabaseClient;
 }
 
-// Export everything properly - NO GETTER SYNTAX
+// FIXED EXPORTS - Use getter for supabaseClient to avoid stale references
 window.workspaceCollaboration = {
     collaborationState: collaborationState,
     initializeSupabase: initializeSupabase,
@@ -474,6 +512,6 @@ window.workspaceCollaboration = {
     removeTagFromWorkspace: removeTagFromWorkspace,
     syncWorkspaceTags: syncWorkspaceTags,
     initializeRealtimeCollaboration: initializeRealtimeCollaboration,
-    supabaseClient: supabaseClient,
+    get supabaseClient() { return supabaseClient; }, // ✅ FIXED: Use getter
     getSupabaseClient: getSupabaseClient
 };
