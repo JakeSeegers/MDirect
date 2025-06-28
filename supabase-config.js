@@ -232,13 +232,15 @@ async function createWorkspace(workspaceName, description, creatorName) {
     }
 }
 
-async function joinWorkspace(workspaceName, password, userName) {
-    if (!supabaseClient) return { success: false, error: 'Supabase not initialized' };
+// Join workspace
+async function joinWorkspace(workspaceName) {
+    if (!supabaseClient || !collaborationState.isAuthenticated) {
+        return { success: false, error: 'Not authenticated' };
+    }
     
     try {
         console.log('🔄 Joining workspace:', workspaceName);
         
-        // Get workspace details
         const { data: workspace, error } = await supabaseClient
             .from('workspaces')
             .select('*')
@@ -249,19 +251,28 @@ async function joinWorkspace(workspaceName, password, userName) {
             return { success: false, error: 'Workspace not found' };
         }
         
-        // Check password
-        if (atob(workspace.password_hash) !== password) {
-            return { success: false, error: 'Incorrect password' };
+        // Check if already a member
+        const { data: existingMember } = await supabaseClient
+            .from('workspace_members')
+            .select('*')
+            .eq('workspace_id', workspace.id)
+            .eq('user_id', collaborationState.currentUser.id)
+            .single();
+            
+        if (!existingMember) {
+            // Add as member
+            const { error: memberError } = await supabaseClient
+                .from('workspace_members')
+                .insert({
+                    workspace_id: workspace.id,
+                    user_id: collaborationState.currentUser.id,
+                    role: 'member'
+                });
+                
+            if (memberError) throw memberError;
         }
         
-        // Set collaboration state (skip workspace_members for now)
         collaborationState.currentWorkspace = workspace;
-        collaborationState.currentUser = {
-            name: userName,
-            joinedAt: new Date().toISOString()
-        };
-        
-        // Initialize real-time collaboration
         await initializeRealtimeCollaboration(workspace.id);
         
         console.log('✅ Joined workspace:', workspaceName);
