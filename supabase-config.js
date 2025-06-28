@@ -326,7 +326,7 @@ async function removeTagFromWorkspace(roomId, tagObject) {
     }
     
     try {
-        const room = state.processedData.find(r => r.id === roomId);
+        const room = state.processedData.find(r => r.id.toString() === roomId.toString());
         if (!room) return false;
         
         const { error } = await supabaseClient
