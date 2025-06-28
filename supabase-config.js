@@ -319,65 +319,27 @@ async function saveTagToWorkspace(roomId, tagObject) {
     }
 }
 
+// Remove tag from workspace
 async function removeTagFromWorkspace(roomId, tagObject) {
-    if (!supabaseClient || !collaborationState.currentWorkspace) return false;
+    if (!supabaseClient || !collaborationState.currentWorkspace || !collaborationState.isAuthenticated) {
+        return false;
+    }
     
     try {
         const room = state.processedData.find(r => r.id.toString() === roomId.toString());
         if (!room) return false;
         
-        // 🔍 First, check who created this tag
-        const { data: existingTags, error: checkError } = await supabaseClient
-            .from('workspace_tags')
-            .select('created_by')
-            .eq('workspace_id', collaborationState.currentWorkspace.id)
-            .eq('room_identifier', room.rmrecnbr || room.id)
-            .eq('tag_name', tagObject.name);
-            
-        if (checkError) throw checkError;
-        
-        if (existingTags && existingTags.length > 0) {
-            const tagCreator = existingTags[0].created_by;
-            const currentUser = collaborationState.currentUser.name;
-            
-            // 🚨 Show popup if trying to delete someone else's tag
-            if (tagCreator !== currentUser) {
-                const confirmMessage = `⚠️ This tag was created by "${tagCreator}"\n\nAre you sure you want to delete their tag "${tagObject.name}"?`;
-                
-                if (!confirm(confirmMessage)) {
-                    console.log('❌ Tag deletion cancelled by user');
-                    return false;
-                }
-                
-                console.log(`🔄 User confirmed deletion of ${tagCreator}'s tag`);
-            }
-        }
-        
-        // 🗑️ Proceed with deletion (remove created_by filter to allow deleting others' tags)
         const { error } = await supabaseClient
             .from('workspace_tags')
             .delete()
             .eq('workspace_id', collaborationState.currentWorkspace.id)
             .eq('room_identifier', room.rmrecnbr || room.id)
-            .eq('tag_name', tagObject.name);
-            // Note: Removed .eq('created_by', collaborationState.currentUser.name) to allow deletion
+            .eq('tag_name', tagObject.name)
+            .eq('created_by', collaborationState.currentUser.id);
             
         if (error) throw error;
         
-        // 📡 Broadcast the deletion
-        if (collaborationState.activeChannel) {
-            await collaborationState.activeChannel.send({
-                type: 'broadcast',
-                event: 'tag_removed',
-                payload: {
-                    room_id: roomId,
-                    tag_name: tagObject.name,
-                    user: collaborationState.currentUser.name
-                }
-            });
-        }
-        
-        console.log('✅ Tag removed securely:', tagObject.name);
+        console.log('✅ Tag removed from workspace:', tagObject.name);
         return true;
         
     } catch (error) {
