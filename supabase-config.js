@@ -3,7 +3,46 @@
 // Your actual Supabase values
 const SUPABASE_URL = 'https://pzcqsorfobygydxkdmzc.supabase.co';
 const SUPABASE_PUBLISHABLE_KEY = 'sb_publishable_HBT2NPpEPDggpLiEG4RllQ_KDJhp0yp';
-
+// Simple confirm replacement - no domain name shown
+function customConfirm(message) {
+    return new Promise((resolve) => {
+        const modal = document.createElement('div');
+        modal.style.cssText = `
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5); display: flex; align-items: center;
+            justify-content: center; z-index: 10000; font-family: system-ui, -apple-system, sans-serif;
+        `;
+        
+        modal.innerHTML = `
+            <div style="background: white; padding: 20px; border-radius: 8px; max-width: 400px; margin: 20px;">
+                <p style="margin: 0 0 20px 0; font-size: 16px; line-height: 1.4;">${message}</p>
+                <div style="text-align: right; gap: 10px; display: flex; justify-content: flex-end;">
+                    <button id="cancel-btn" style="padding: 8px 16px; background: #6b7280; color: white; border: none; border-radius: 4px; cursor: pointer;">Cancel</button>
+                    <button id="ok-btn" style="padding: 8px 16px; background: #ef4444; color: white; border: none; border-radius: 4px; cursor: pointer;">Delete</button>
+                </div>
+            </div>
+        `;
+        
+        document.body.appendChild(modal);
+        
+        modal.querySelector('#ok-btn').onclick = () => {
+            document.body.removeChild(modal);
+            resolve(true);
+        };
+        
+        modal.querySelector('#cancel-btn').onclick = () => {
+            document.body.removeChild(modal);
+            resolve(false);
+        };
+        
+        modal.onclick = (e) => {
+            if (e.target === modal) {
+                document.body.removeChild(modal);
+                resolve(false);
+            }
+        };
+    });
+}
 let supabaseClient = null;
 
 // Collaboration state
