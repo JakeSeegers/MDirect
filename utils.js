@@ -40,12 +40,17 @@ function clearErrors() {
 }
 
 function addError(errorMessage) {
-  state.errors.push(errorMessage);
+  // Use sanitized message for display
+  const sanitizedMessage = typeof window.sanitizeErrorMessage === 'function' 
+    ? window.sanitizeErrorMessage(errorMessage) 
+    : errorMessage;
+  
+  state.errors.push(sanitizedMessage);
   if(elements.errorsContainer) elements.errorsContainer.classList.remove('hidden');
   const li = document.createElement('li');
-  li.textContent = errorMessage;
+  li.textContent = sanitizedMessage;
   if(elements.errorsList) elements.errorsList.appendChild(li);
-  console.error(errorMessage);
+  console.error(sanitizedMessage);
 }
 
 function downloadFile(content, fileName, contentType) {
@@ -83,3 +88,34 @@ function createRichTag(name, type, description, link, contact, imageUrl, color) 
     isRich: type !== 'simple' || !!description || !!link || !!contact || !!imageUrl || color !== 'blue' // Flag if it has more than just a name/default color
   };
 }
+
+// === SIMPLE ERROR MESSAGE SANITIZATION ===
+
+function sanitizeErrorMessage(message) {
+    if (!message || typeof message !== 'string') return message;
+    
+    let sanitized = message;
+    
+    // Remove "jakeseegers.github.io says" completely
+    sanitized = sanitized.replace(/jakeseegers\.github\.io\s+says/gi, '');
+    
+    // Change "Workspace [name] not found" to "Workspace not available."
+    sanitized = sanitized.replace(/Workspace\s+.+?\s+not found/gi, 'Workspace not available');
+    
+    // Clean up extra whitespace
+    sanitized = sanitized.replace(/\s+/g, ' ').trim();
+    
+    return sanitized;
+}
+
+// Store original alert function
+const originalAlert = window.alert;
+
+// Override global alert to sanitize messages
+window.alert = function(message) {
+    const sanitizedMessage = sanitizeErrorMessage(message);
+    return originalAlert.call(window, sanitizedMessage);
+};
+
+// Expose sanitization function globally
+window.sanitizeErrorMessage = sanitizeErrorMessage;
